@@ -14,11 +14,12 @@
             height: 100%;
             overflow: hidden;
             font-family: Arial, sans-serif;
-            position: relative;
+            position: fixed; /* Assure que le contenu reste fixe et évite le glissement */
         }
         #map {
             width: 100%;
             height: 100%;
+            overflow: hidden; /* Empêche tout débordement dans cet élément */
         }
         /* Panneaux de contrôle */
         #controls-container, #depot-container {
