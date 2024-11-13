@@ -35,6 +35,7 @@
             box-sizing: border-box;
             transition: transform 0.3s ease;
             z-index: 10;
+            overflow-y: auto; /* Ajouté pour permettre le défilement si contenu trop long */
         }
         #controls-container {
             left: 0;
@@ -97,6 +98,7 @@
             box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
             font-size: 20px;
             -webkit-user-select: none;
+            user-select: none;
         }
         #toggle-controls {
             left: 20px;
@@ -151,7 +153,7 @@
             cursor: pointer;
         }
         /* Style pour descendre les contrôles de navigation en haut à droite */
-            .mapboxgl-ctrl-top-right {
+        .mapboxgl-ctrl-top-right {
             top: 25%;
         }
         /* Barre de recherche d'adresse et sélection de tracker */
@@ -167,7 +169,6 @@
             display: flex;
             align-items: center;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-            /* Changement pour aligner les éléments horizontalement */
         }
         .search-bar {
             position: relative;
@@ -329,6 +330,119 @@
         }
         #credentials-form button:hover {
             background: #0056b3;
+        }
+
+        /* Media Queries pour les écrans de 768px et moins (tablettes et mobiles) */
+        @media (max-width: 768px) {
+            /* Ajuster la largeur des panneaux de contrôle */
+            #controls-container, #depot-container {
+                width: 80%; /* Réduire la largeur pour s'adapter aux petits écrans */
+            }
+            
+            /* Modifier la position des panneaux pour éviter de couvrir trop d'écran */
+            #controls-container {
+                top: 0;
+                left: 0;
+                transform: translateX(-100%);
+            }
+            #depot-container {
+                top: 0;
+                right: 0;
+                transform: translateX(100%);
+            }
+
+            /* Ajuster les titres des panneaux */
+            #controls-container h2, #depot-container h2 {
+                margin-top: 20px; /* Réduire la marge supérieure */
+                font-size: 1em;
+            }
+
+            /* Modifier la barre de recherche pour qu'elle prenne plus de place */
+            #search-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            /* Ajuster la largeur des éléments de la barre de recherche */
+            #search-input {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            #tracker-select, #route-button {
+                width: 100%;
+                margin-left: 0;
+                margin-bottom: 10px;
+            }
+
+            /* Ajuster la position des boutons de basculement */
+            .toggle-button {
+                width: 35px;
+                height: 35px;
+                font-size: 18px;
+            }
+
+            /* Ajuster la position de la timeline */
+            #timeline-container {
+                width: 100%;
+            }
+
+            /* Afficher les contrôles de navigation en bas à droite pour éviter de couvrir les éléments importants */
+            .mapboxgl-ctrl-top-right {
+                top: auto;
+                bottom: 20%;
+            }
+        }
+
+        /* Media Queries pour les écrans de 480px et moins (smartphones) */
+        @media (max-width: 480px) {
+            /* Réduire davantage la largeur des panneaux de contrôle */
+            #controls-container, #depot-container {
+                width: 90%;
+            }
+
+            /* Réduire la taille des polices pour une meilleure lisibilité */
+            #controls-container h2, #depot-container h2 {
+                font-size: 1em;
+            }
+
+            /* Ajuster les paddings */
+            #controls-container, #depot-container {
+                padding: 15px;
+            }
+
+            /* Ajuster la taille des boutons et des éléments interactifs */
+            #search-button, #route-button, .toggle-button {
+                font-size: 16px;
+                padding: 10px;
+            }
+
+            /* Ajuster la taille des éléments de la timeline */
+            #timeline {
+                width: 90%;
+            }
+
+            /* Réduire la taille des marqueurs de la timeline */
+            .timeline-marker {
+                width: 10px;
+                height: 10px;
+            }
+
+            /* Ajuster la barre de recherche */
+            .search-bar {
+                max-width: 100%;
+            }
+        }
+
+        /* Améliorations supplémentaires pour une meilleure expérience tactile */
+        /* Augmenter la taille des zones cliquables */
+        label, button, select {
+            min-height: 40px;
+            padding: 10px;
+        }
+
+        /* Assurer un bon espacement entre les éléments */
+        #controls-content, #depot-content, #search-container {
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -617,7 +731,7 @@
                         console.warn(`Tracker ${tracker.name || tracker.deviceId} a des coordonnées invalides.`);
                     }
                 }
-            });
+            }
 
             // ** Suppression de l'auto-centrage sur le premier tracker **
             /*
@@ -679,12 +793,29 @@
 
         // Ajouter des écouteurs pour les boutons de basculement
         function setupToggleButtons() {
-            document.getElementById('toggle-controls').addEventListener('click', () => {
-                document.getElementById('controls-container').classList.toggle('active');
+            const toggleControls = document.getElementById('toggle-controls');
+            const toggleDepot = document.getElementById('toggle-depot');
+
+            toggleControls.addEventListener('click', () => {
+                const controls = document.getElementById('controls-container');
+                controls.classList.toggle('active');
+                
+                // Fermer le panneau Dépôt si ouvert
+                const depot = document.getElementById('depot-container');
+                if (depot.classList.contains('active')) {
+                    depot.classList.remove('active');
+                }
             });
 
-            document.getElementById('toggle-depot').addEventListener('click', () => {
-                document.getElementById('depot-container').classList.toggle('active');
+            toggleDepot.addEventListener('click', () => {
+                const depot = document.getElementById('depot-container');
+                depot.classList.toggle('active');
+                
+                // Fermer le panneau Contrôles si ouvert
+                const controls = document.getElementById('controls-container');
+                if (controls.classList.contains('active')) {
+                    controls.classList.remove('active');
+                }
             });
         }
 
@@ -1024,7 +1155,6 @@
 
             // Ajouter des contrôles de navigation en haut à droite
             map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-            
 
             // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
             setupMapClickListener();
