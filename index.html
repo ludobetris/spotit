@@ -792,33 +792,53 @@
             }
         }
 
-        // Ajouter des écouteurs pour les boutons de basculement
-        function setupToggleButtons() {
-            const toggleControls = document.getElementById('toggle-controls');
-            const toggleDepot = document.getElementById('toggle-depot');
+// Ajouter des écouteurs pour les boutons de basculement
+function setupToggleButtons() {
+    const toggleControls = document.getElementById('toggle-controls');
+    const toggleDepot = document.getElementById('toggle-depot');
+    const controls = document.getElementById('controls-container');
+    const depot = document.getElementById('depot-container');
 
-            toggleControls.addEventListener('click', () => {
-                const controls = document.getElementById('controls-container');
-                controls.classList.toggle('active');
-                
-                // Fermer le panneau Dépôt si ouvert
-                const depot = document.getElementById('depot-container');
-                if (depot.classList.contains('active')) {
-                    depot.classList.remove('active');
-                }
-            });
-
-            toggleDepot.addEventListener('click', () => {
-                const depot = document.getElementById('depot-container');
-                depot.classList.toggle('active');
-                
-                // Fermer le panneau Contrôles si ouvert
-                const controls = document.getElementById('controls-container');
-                if (controls.classList.contains('active')) {
-                    controls.classList.remove('active');
-                }
-            });
+    toggleControls.addEventListener('click', (event) => {
+        controls.classList.toggle('active');
+        
+        // Fermer le panneau Dépôt si ouvert
+        if (depot.classList.contains('active')) {
+            depot.classList.remove('active');
         }
+
+        // Empêcher la propagation pour éviter la fermeture immédiate
+        event.stopPropagation();
+    });
+
+    toggleDepot.addEventListener('click', (event) => {
+        depot.classList.toggle('active');
+        
+        // Fermer le panneau Contrôles si ouvert
+        if (controls.classList.contains('active')) {
+            controls.classList.remove('active');
+        }
+
+        // Empêcher la propagation pour éviter la fermeture immédiate
+        event.stopPropagation();
+    });
+
+    // Ajouter un écouteur de clic global pour fermer les panneaux en cliquant à l'extérieur
+    document.addEventListener('click', (event) => {
+        const isClickOutsideControls = !controls.contains(event.target) && event.target !== toggleControls;
+        const isClickOutsideDepot = !depot.contains(event.target) && event.target !== toggleDepot;
+
+        // Fermer le panneau de contrôle s'il est actif et qu'on clique à l'extérieur
+        if (controls.classList.contains('active') && isClickOutsideControls) {
+            controls.classList.remove('active');
+        }
+
+        // Fermer le panneau de dépôt s'il est actif et qu'on clique à l'extérieur
+        if (depot.classList.contains('active') && isClickOutsideDepot) {
+            depot.classList.remove('active');
+        }
+    });
+}
 
         // Ajouter un écouteur pour le switch de la vue de la carte
         function setupMapSwitch() {
