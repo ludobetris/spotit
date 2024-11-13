@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte Mapbox avec Trackers Traccar</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            position: relative;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        /* Panneaux de contrôle */
+        #controls-container, #depot-container {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            background: rgba(240, 240, 240, 0.95);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+            padding: 20px;
+            box-sizing: border-box;
+            transition: transform 0.3s ease;
+            z-index: 10;
+        }
+        #controls-container {
+            left: 0;
+            transform: translateX(-100%);
+        }
+        #depot-container {
+            right: 0;
+            transform: translateX(100%);
+        }
+        #controls-container.active {
+            transform: translateX(0);
+        }
+        #depot-container.active {
+            transform: translateX(0);
+        }
+        /* Titres des panneaux */
+        #controls-container h2, #depot-container h2 {
+            margin-top: 70px; /* Réduit la marge supérieure pour un meilleur alignement */
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            flex-shrink: 0;
+        }
+        /* Contenu des panneaux */
+        #controls-content, #depot-content {
+            flex-grow: 1;
+        }
+        /* Group checkboxes empilés verticalement */
+        .group-checkbox {
+            margin-bottom: 10px;
+            overflow-y: auto;
+        }
+        .group-checkbox label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            cursor: pointer;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background: #fff;
+        }
+        .group-checkbox input[type="checkbox"] {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        /* Boutons de basculement */
+        .toggle-button {
+            position: absolute;
+            top: 20px;
+            width: 40px;
+            height: 40px;
+            background: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            font-size: 20px;
+            user-select: none;
+        }
+        #toggle-controls {
+            left: 20px;
+        }
+        #toggle-depot {
+            right: 20px;
+        }
+        /* Liste "Dépôt" */
+        #depot-content ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #depot-content li {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+        }
+        #depot-content li:last-child {
+            border-bottom: none;
+        }
+        /* Switch pour changer la vue de la carte */
+        #map-switch-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px; /* Positionné discrètement au bas gauche */
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+        #map-switch {
+            margin-left: 5px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        /* Barre de recherche d'adresse et sélection de tracker */
+        #search-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+        #search-input {
+            width: 200px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        #search-button {
+            margin-left: 5px;
+            padding: 5px 10px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #search-button:hover {
+            background: #0056b3;
+        }
+        /* Bouton pour afficher la route */
+        #route-button {
+            margin-left: 10px;
+            padding: 5px 10px;
+            border: none;
+            background: #28a745;
+            color: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #route-button:hover {
+            background: #1e7e34;
+        }
+        /* Select pour choisir le tracker */
+        #tracker-select {
+            margin-left: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 16px;
+            width: 200px;
+        }
+
+        /* Amélioration de l'apparence des listes */
+        #group-list, #depot-list {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Timeline */
+        #timeline-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            box-sizing: border-box;
+            display: none; /* Caché par défaut */
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
+            z-index: 20;
+        }
+        #timeline {
+            width: 80%;
+        }
+        #current-time {
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        /* Marqueur de la timeline */
+        .timeline-marker {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: yellow;
+            border: 2px solid red;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Barre de recherche d'adresse et sélection de tracker -->
+    <div id="search-container">
+        <input type="text" id="search-input" placeholder="Rechercher une adresse">
+        <button id="search-button">🔍</button>
+        <!-- Sélecteur de tracker -->
+        <select id="tracker-select">
+            <option value="">Sélectionner un tracker</option>
+            <!-- Options seront ajoutées dynamiquement -->
+        </select>
+        <button id="route-button">Afficher Route</button>
+    </div>
+
+    <!-- Panneaux de contrôle -->
+    <div id="controls-container">
+        <h2>Groupes</h2>
+        <div id="controls-content">
+            <div id="group-list">
+                <!-- Les cases à cocher des groupes seront générées dynamiquement -->
+            </div>
+        </div>
+    </div>
+    <div id="depot-container">
+        <h2>Dépôt</h2>
+        <div id="depot-content">
+            <ul id="depot-list">
+                <!-- Liste des trackers dans un rayon de 200m sera générée ici -->
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Boutons de basculement -->
+    <div id="toggle-controls" class="toggle-button" title="Afficher/masquer les Groupes">
+        &#9776;
+    </div>
+    <div id="toggle-depot" class="toggle-button" title="Afficher/masquer Dépôt">
+        &#9776;
+    </div>
+
+    <!-- Switch pour changer la vue de la carte -->
+    <div id="map-switch-container">
+        <span>Satellite</span>
+        <input type="checkbox" id="map-switch" title="Changer la vue de la carte">
+    </div>
+
+    <!-- Timeline -->
+    <div id="timeline-container">
+        <input type="range" id="timeline" min="0" max="100" value="0">
+        <span id="current-time">00:00:00</span>
+    </div>
+
+    <!-- Carte Mapbox -->
+    <div id="map"></div>
+
+    <script type="module">
+        import { MAPBOX_API_KEY, TRACCAR_AUTH } from './config.js';
+        mapboxgl.accessToken = MAPBOX_API_KEY;
+
+        // Initialisation de la carte
+        var map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [7.475422, 46.257917], // Coordonnées de départ (Rue des Etreys 38 à Grône)
+            zoom: 14
+        });
+
+        // Variables globales pour stocker les données
+        let trackers = [];
+        let markers = {};
+        let groups = []; // Liste des groupes
+        let groupIdToName = {}; // Mapping de groupId à groupName
+
+        // Coordonnées de référence pour "Rue des Etreys 38 à Grône"
+        const depotCoordinates = [7.475422, 46.257917]; // [longitude, latitude]
+
+        // Variables pour les marqueurs de recherche et de route
+        let searchMarker = null;
+        let routeLayerId = 'tracker-route';
+        let routeCoordinates = []; // Stocke les coordonnées de la route
+        let timelineData = []; // Stocke les données pour la timeline
+        let timelineMarker = null; // Marqueur pour la timeline
+
+        // Fonction de calcul de distance (Haversine)
+        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Rayon de la Terre en mètres
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const d = R * c;
+            return d;
+        }
+
+        // Fonction pour obtenir les données des groupes, devices, et positions de Traccar
+        async function getTrackersData() {
+            try {
+                // 1. Fetch Groups
+                const groupsResponse = await fetch('https://demo2.traccar.org/api/groups', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa('l.betrisey@solioz-merkli.ch:Clapton/1254'),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const groupsData = await groupsResponse.json();
+                console.log('Groupes reçus:', groupsData);
+                groups = groupsData;
+                groups.forEach(group => {
+                    groupIdToName[group.id] = group.name;
+                });
+
+                // 2. Fetch Devices
+                const devicesResponse = await fetch('https://demo2.traccar.org/api/devices', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable importée
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const devicesData = await devicesResponse.json();
+                console.log('Devices reçus:', devicesData);
+                const deviceIdToInfo = {};
+                devicesData.forEach(device => {
+                    deviceIdToInfo[device.id] = {
+                        name: device.name || `Tracker ${device.id}`,
+                        group: device.groupId ? groupIdToName[device.groupId] || 'Autre' : 'Autre'
+                    };
+                });
+
+                // 3. Fetch Positions (Latest Positions)
+                const positionsResponse = await fetch('https://demo2.traccar.org/api/positions', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable importée
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const positionsData = await positionsResponse.json();
+                console.log('Positions reçues:', positionsData);
+
+                // 4. Assign name and group from devices data
+                trackers = positionsData.map(position => ({
+                    ...position,
+                    name: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].name) || `Tracker ${position.deviceId}`,
+                    group: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].group) || 'Autre',
+                    latitude: parseFloat(position.latitude),
+                    longitude: parseFloat(position.longitude),
+                    time: position.time // Assurez-vous que la propriété 'time' est présente
+                }));
+
+                displayGroupCheckboxes();
+                populateTrackerSelect();
+                updateMap();
+                populateDepotList();
+            } catch (error) {
+                console.error('Erreur lors de la récupération des données:', error);
+            }
+        }
+
+        // Fonction pour afficher les cases à cocher des groupes
+        function displayGroupCheckboxes() {
+            const groupList = document.getElementById('group-list');
+            groupList.innerHTML = ''; // Clear existing list
+
+            // Get unique groups
+            const uniqueGroups = [...new Set(trackers.map(tracker => tracker.group))].sort();
+
+            uniqueGroups.forEach(groupe => {
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                checkbox.classList.add('group-checkbox');
+                checkbox.dataset.groupe = groupe;
+                checkbox.addEventListener('change', updateMap);
+
+                const label = document.createElement('label');
+                label.textContent = groupe;
+                label.prepend(checkbox);
+
+                groupList.appendChild(label);
+            });
+        }
+
+        // Fonction pour peupler le sélecteur de trackers
+        function populateTrackerSelect() {
+            const trackerSelect = document.getElementById('tracker-select');
+            trackerSelect.innerHTML = '<option value="">Sélectionner un tracker</option>'; // Reset options
+
+            trackers.forEach(tracker => {
+                const option = document.createElement('option');
+                option.value = tracker.deviceId;
+                option.textContent = tracker.name;
+                trackerSelect.appendChild(option);
+            });
+
+        // Ajouter un écouteur de changement sur le sélecteur de tracker
+        document.getElementById('tracker-select').addEventListener('change', (event) => {
+            const selectedTrackerId = event.target.value;
+    
+        // Trouver le tracker correspondant dans la liste des trackers
+        const selectedTracker = trackers.find(tracker => tracker.deviceId == selectedTrackerId);
+    
+        if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
+            // Centrer la carte sur les coordonnées du tracker sélectionné
+            map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude], zoom: 14 });
+            console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
+    }
+});
+
+        }
+
+        // Fonction pour mettre à jour la carte en fonction des groupes sélectionnés
+        function updateMap() {
+            // Retire les marqueurs existants
+            Object.values(markers).forEach(marker => marker.remove());
+            markers = {};
+
+            // Récupère les groupes cochés
+            const checkedGroups = Array.from(document.querySelectorAll('.group-checkbox:checked'))
+                .map(checkbox => checkbox.dataset.groupe);
+            console.log('Groupes cochés:', checkedGroups);
+
+            // Affiche les trackers des groupes cochés
+            trackers.forEach(tracker => {
+                const groupe = tracker.group;
+                if (checkedGroups.includes(groupe)) {
+                    // Vérifier que les coordonnées sont valides
+                    if (typeof tracker.longitude === 'number' && typeof tracker.latitude === 'number') {
+                        let marker;
+                        if (groupe.toLowerCase() === 'pickups') { // Vérification insensible à la casse
+                            // Créer un élément img pour l'icône personnalisée
+                            const el = document.createElement('img');
+                            el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
+                            el.style.width = '2%'; // Ajustez la taille selon vos besoins
+                            el.style.height = '2%';
+                            el.style.objectFit = 'cover'; // Pour s'assurer que l'image est bien ajustée
+
+                            marker = new mapboxgl.Marker(el) // Utiliser l'élément personnalisé
+                                .setLngLat([tracker.longitude, tracker.latitude])
+                                .setPopup(new mapboxgl.Popup().setHTML(`<strong>Nom:</strong> ${tracker.name || "Inconnu"}`))
+                                .addTo(map);
+                        } else {
+                            // Marqueur par défaut
+                            marker = new mapboxgl.Marker()
+                                .setLngLat([tracker.longitude, tracker.latitude])
+                                .setPopup(new mapboxgl.Popup().setHTML(`<strong>Nom:</strong> ${tracker.name || "Inconnu"}`))
+                                .addTo(map);
+                        }
+                        markers[tracker.deviceId] = marker;
+                        console.log(`Ajout du tracker ${tracker.name || tracker.deviceId} au groupe ${groupe}`);
+                    } else {
+                        console.warn(`Tracker ${tracker.name || tracker.deviceId} a des coordonnées invalides.`);
+                    }
+                }
+            });
+
+            // Centrer la carte sur le premier tracker affiché, s'il y en a
+            const firstTracker = trackers.find(tracker => checkedGroups.includes(tracker.group) &&
+                typeof tracker.longitude === 'number' && typeof tracker.latitude === 'number');
+            if (firstTracker) {
+                map.flyTo({ center: [firstTracker.longitude, firstTracker.latitude], zoom: 14 });
+                console.log(`Centrage de la carte sur le tracker ${firstTracker.name || firstTracker.deviceId}`);
+            }
+        }
+
+        // Fonction pour peupler la liste "Dépôt" avec les trackers dans un rayon de 200m
+        function populateDepotList() {
+            const depotList = document.getElementById('depot-list');
+            depotList.innerHTML = ''; // Clear existing list
+
+            trackers.forEach(tracker => {
+                if (typeof tracker.latitude === 'number' && typeof tracker.longitude === 'number') {
+                    const distance = getDistanceFromLatLonInMeters(
+                        depotCoordinates[1],
+                        depotCoordinates[0],
+                        tracker.latitude,
+                        tracker.longitude
+                    );
+                    console.log(`${tracker.name}: Distance = ${distance.toFixed(1)}m`);
+                    if (distance <= 200) {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `${tracker.name} (${distance.toFixed(1)}m)`;
+                        depotList.appendChild(listItem);
+                    }
+                }
+            });
+
+            // Vérification si aucun tracker n'est dans le rayon
+            if (depotList.children.length === 0) {
+                const noTrackersItem = document.createElement('li');
+                noTrackersItem.textContent = "Aucun tracker dans un rayon de 200m.";
+                depotList.appendChild(noTrackersItem);
+            }
+        }
+
+        // Ajouter des écouteurs pour les boutons de basculement
+        document.getElementById('toggle-controls').addEventListener('click', () => {
+            document.getElementById('controls-container').classList.toggle('active');
+        });
+
+        document.getElementById('toggle-depot').addEventListener('click', () => {
+            document.getElementById('depot-container').classList.toggle('active');
+        });
+
+        // Ajouter un écouteur pour le switch de la vue de la carte
+        document.getElementById('map-switch').addEventListener('change', (event) => {
+            if (event.target.checked) {
+                // Changer en vue satellite
+                map.setStyle('mapbox://styles/mapbox/satellite-v9');
+            } else {
+                // Changer en vue streets
+                map.setStyle('mapbox://styles/mapbox/streets-v11');
+            }
+        });
+
+        // Ajouter un écouteur pour la barre de recherche
+        document.getElementById('search-button').addEventListener('click', () => {
+            const query = document.getElementById('search-input').value;
+            if (query.trim() === '') {
+                alert('Veuillez entrer une adresse à rechercher.');
+                return;
+            }
+
+            // Utiliser l'API de géocodage de Mapbox
+            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxgl.accessToken}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.features.length === 0) {
+                        alert('Aucun résultat trouvé pour cette adresse.');
+                        return;
+                    }
+
+                    // Prendre le premier résultat
+                    const firstResult = data.features[0];
+                    const [lng, lat] = firstResult.center;
+
+                    // Centrer la carte sur le résultat
+                    map.flyTo({ center: [lng, lat], zoom: 14 });
+
+                    // Supprimer l'ancien marqueur de recherche s'il existe
+                    if (searchMarker) {
+                        searchMarker.remove();
+                    }
+
+                    // Ajouter un marqueur pour le résultat
+                    searchMarker = new mapboxgl.Marker({ color: 'red' })
+                        .setLngLat([lng, lat])
+                        .setPopup(new mapboxgl.Popup().setHTML(`<strong>Résultat:</strong> ${firstResult.place_name}`))
+                        .addTo(map)
+                        .togglePopup();
+
+                    console.log(`Adresse trouvée: ${firstResult.place_name} à [${lng}, ${lat}]`);
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la géocodage:', error);
+                    alert('Une erreur est survenue lors de la recherche de l\'adresse.');
+                });
+        });
+
+        // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
+        map.on('click', () => {
+            if (searchMarker) {
+                searchMarker.remove();
+                searchMarker = null;
+            }
+            // Supprimer le trajet si il existe
+            removeRoute();
+            // Supprimer la timeline si elle est affichée
+            hideTimeline();
+            // Supprimer le marqueur de la timeline
+            if (timelineMarker) {
+                timelineMarker.remove();
+                timelineMarker = null;
+            }
+        });
+
+        // Fonction pour afficher la route du tracker sélectionné
+        document.getElementById('route-button').addEventListener('click', () => {
+            const trackerId = document.getElementById('tracker-select').value;
+            if (!trackerId) {
+                alert('Veuillez sélectionner un tracker pour afficher la route.');
+                return;
+            }
+
+            // Définir la période pour la journée actuelle
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+
+            // Fetch the track data using the /api/positions endpoint with query parameters
+            fetch(`https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + btoa('l.betrisey@solioz-merkli.ch:Clapton/1254'),
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    console.error("Erreur de la réponse :", response.statusText); // Ajout du log d'erreur
+                    throw new Error('Erreur lors de la récupération des données de la route.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data.length) {
+                    alert('Aucune donnée de route disponible pour ce tracker aujourd\'hui.');
+                    return;
+                }
+
+                // Trier les données par timestamp pour s'assurer que les points sont dans l'ordre
+                data.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+                // Préparer les coordonnées pour la ligne
+                const coordinates = data.map(position => [parseFloat(position.longitude), parseFloat(position.latitude)]);
+
+                // Stocker les données pour la timeline en utilisant deviceTime directement
+                timelineData = data.map(position => ({
+                    time: new Date(position.deviceTime), // Utilise directement deviceTime sans modification
+                    coordinates: [parseFloat(position.longitude), parseFloat(position.latitude)]
+                }));
+
+                // Ajouter la ligne à la carte
+                addRouteToMap(coordinates);
+
+                // Initialiser la timeline
+                initializeTimeline();
+            })
+            .catch(error => {
+                console.error('Erreur lors de la récupération des données de la route:', error);
+                alert('Une erreur est survenue lors de la récupération des données de la route.');
+            });
+        });
+
+        // Fonction pour ajouter la route à la carte
+        function addRouteToMap(coordinates) {
+            // Supprimer l'ancienne route si elle existe
+            removeRoute();
+
+            // Ajouter la source
+            map.addSource(routeLayerId, {
+                'type': 'geojson',
+                'data': {
+                    'type': 'Feature',
+                    'properties': {},
+                    'geometry': {
+                        'type': 'LineString',
+                        'coordinates': coordinates
+                    }
+                }
+            });
+
+            // Ajouter la couche
+            map.addLayer({
+                'id': routeLayerId,
+                'type': 'line',
+                'source': routeLayerId,
+                'layout': {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                'paint': {
+                    'line-color': '#FF0000',
+                    'line-width': 4
+                }
+            });
+
+            console.log('Route ajoutée à la carte.');
+        }
+
+        // Fonction pour supprimer la route de la carte
+        function removeRoute() {
+            if (map.getLayer(routeLayerId)) {
+                map.removeLayer(routeLayerId);
+            }
+            if (map.getSource(routeLayerId)) {
+                map.removeSource(routeLayerId);
+            }
+            console.log('Route supprimée de la carte.');
+        }
+
+        // Fonction pour initialiser la timeline
+        function initializeTimeline() {
+            const timelineContainer = document.getElementById('timeline-container');
+            const timeline = document.getElementById('timeline');
+            const currentTimeDisplay = document.getElementById('current-time');
+
+            if (timelineData.length === 0) {
+                console.log('Aucune donnée pour la timeline.');
+                return;
+            }
+
+            // Afficher la timeline
+            timelineContainer.style.display = 'flex';
+
+            // Configurer le curseur
+            timeline.min = 0;
+            timeline.max = timelineData.length - 1;
+            timeline.value = 0;
+
+            // Afficher l'heure du premier point
+            currentTimeDisplay.textContent = formatTime(timelineData[0].time);
+
+            // Supprimer l'ancien marqueur de la timeline si il existe
+            if (timelineMarker) {
+                timelineMarker.remove();
+                timelineMarker = null;
+            }
+
+            // Ajouter un marqueur de timeline initial
+            timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' })
+                .setLngLat(timelineData[0].coordinates)
+                .addTo(map);
+
+            // Ajouter un écouteur pour le curseur de la timeline
+            timeline.addEventListener('input', (event) => {
+                const index = parseInt(event.target.value);
+                const position = timelineData[index];
+                if (!position) return;
+
+                // Mettre à jour l'affichage de l'heure
+                currentTimeDisplay.textContent = formatTime(position.time);
+
+                // Déplacer le marqueur de la timeline
+                if (timelineMarker) {
+                    timelineMarker.setLngLat(position.coordinates);
+                } else {
+                    timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' })
+                        .setLngLat(position.coordinates)
+                        .addTo(map);
+                }
+
+                // Centrer la carte sur le marqueur de la timeline
+                map.flyTo({ center: position.coordinates, zoom: 14 });
+            });
+        }
+
+        // Fonction pour cacher la timeline
+        function hideTimeline() {
+            const timelineContainer = document.getElementById('timeline-container');
+            timelineContainer.style.display = 'none';
+            // Réinitialiser la timeline
+            const timeline = document.getElementById('timeline');
+            timeline.value = 0;
+            const currentTimeDisplay = document.getElementById('current-time');
+            currentTimeDisplay.textContent = '00:00:00';
+        }
+
+        // Fonction pour formater l'heure
+        function formatTime(date) {
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+        }
+
+        // Appel de la fonction pour récupérer et afficher les données des trackers
+        getTrackersData();
+    </script>
+</body>
+</html>
