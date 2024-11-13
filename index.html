@@ -232,11 +232,79 @@
             transform: translate(-50%, -50%);
             pointer-events: none;
         }
+
+        /* Modal Styles */
+        #credentials-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        #credentials-form {
+            background: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            width: 300px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        #credentials-form h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        #credentials-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        #credentials-form input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        #credentials-form button {
+            width: 100%;
+            padding: 10px;
+            background: #007bff;
+            border: none;
+            color: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #credentials-form button:hover {
+            background: #0056b3;
+        }
     </style>
 </head>
 <body>
+    <!-- Modal pour saisir les identifiants -->
+    <div id="credentials-modal">
+        <form id="credentials-form">
+            <h2>Connexion</h2>
+            <label for="mapbox-key">Clé API Mapbox :</label>
+            <input type="text" id="mapbox-key" required placeholder="Entrez votre clé API Mapbox">
+            
+            <label for="traccar-username">Nom d'utilisateur Traccar :</label>
+            <input type="text" id="traccar-username" required placeholder="Entrez votre nom d'utilisateur">
+            
+            <label for="traccar-password">Mot de passe Traccar :</label>
+            <input type="password" id="traccar-password" required placeholder="Entrez votre mot de passe">
+            
+            <button type="submit">Se Connecter</button>
+        </form>
+    </div>
+
     <!-- Barre de recherche d'adresse et sélection de tracker -->
-    <div id="search-container">
+    <div id="search-container" style="display: none;">
         <input type="text" id="search-input" placeholder="Rechercher une adresse">
         <button id="search-button">🔍</button>
         <!-- Sélecteur de tracker -->
@@ -266,15 +334,15 @@
     </div>
     
     <!-- Boutons de basculement -->
-    <div id="toggle-controls" class="toggle-button" title="Afficher/masquer les Groupes">
+    <div id="toggle-controls" class="toggle-button" title="Afficher/masquer les Groupes" style="display: none;">
         &#9776;
     </div>
-    <div id="toggle-depot" class="toggle-button" title="Afficher/masquer Dépôt">
+    <div id="toggle-depot" class="toggle-button" title="Afficher/masquer Dépôt" style="display: none;">
         &#9776;
     </div>
 
     <!-- Switch pour changer la vue de la carte -->
-    <div id="map-switch-container">
+    <div id="map-switch-container" style="display: none;">
         <span>Satellite</span>
         <input type="checkbox" id="map-switch" title="Changer la vue de la carte">
     </div>
@@ -288,17 +356,13 @@
     <!-- Carte Mapbox -->
     <div id="map"></div>
 
-    <script type="module">
-        import { MAPBOX_API_KEY, TRACCAR_AUTH } from './config.js';
-        mapboxgl.accessToken = MAPBOX_API_KEY;
+    <script>
+        // Variables globales pour les identifiants
+        let MAPBOX_API_KEY = '';
+        let TRACCAR_AUTH = '';
 
-        // Initialisation de la carte
-        var map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/streets-v11',
-            center: [7.475422, 46.257917], // Coordonnées de départ (Rue des Etreys 38 à Grône)
-            zoom: 14
-        });
+        // Variables globales pour la carte
+        let map; // Déclarer map comme variable globale
 
         // Variables globales pour stocker les données
         let trackers = [];
@@ -337,7 +401,7 @@
                 const groupsResponse = await fetch('https://demo2.traccar.org/api/groups', {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Basic ' + btoa('l.betrisey@solioz-merkli.ch:Clapton/1254'),
+                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable définie
                         'Content-Type': 'application/json'
                     }
                 });
@@ -352,7 +416,7 @@
                 const devicesResponse = await fetch('https://demo2.traccar.org/api/devices', {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable importée
+                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable définie
                         'Content-Type': 'application/json'
                     }
                 });
@@ -370,7 +434,7 @@
                 const positionsResponse = await fetch('https://demo2.traccar.org/api/positions', {
                     method: 'GET',
                     headers: {
-                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable importée
+                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable définie
                         'Content-Type': 'application/json'
                     }
                 });
@@ -393,6 +457,7 @@
                 populateDepotList();
             } catch (error) {
                 console.error('Erreur lors de la récupération des données:', error);
+                alert('Une erreur est survenue lors de la récupération des données des trackers.');
             }
         }
 
@@ -432,24 +497,28 @@
                 trackerSelect.appendChild(option);
             });
 
-        // Ajouter un écouteur de changement sur le sélecteur de tracker
-        document.getElementById('tracker-select').addEventListener('change', (event) => {
-            const selectedTrackerId = event.target.value;
-    
-        // Trouver le tracker correspondant dans la liste des trackers
-        const selectedTracker = trackers.find(tracker => tracker.deviceId == selectedTrackerId);
-    
-        if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
-            // Centrer la carte sur les coordonnées du tracker sélectionné
-            map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude], zoom: 14 });
-            console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
-    }
-});
-
+            // Ajouter un écouteur de changement sur le sélecteur de tracker
+            trackerSelect.addEventListener('change', (event) => {
+                const selectedTrackerId = event.target.value;
+        
+                // Trouver le tracker correspondant dans la liste des trackers
+                const selectedTracker = trackers.find(tracker => tracker.deviceId == selectedTrackerId);
+        
+                if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
+                    // Centrer la carte sur les coordonnées du tracker sélectionné
+                    map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude], zoom: 14 });
+                    console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
+                }
+            });
         }
 
         // Fonction pour mettre à jour la carte en fonction des groupes sélectionnés
         function updateMap() {
+            if (!map) {
+                console.warn('La carte n\'est pas encore initialisée.');
+                return;
+            }
+
             // Retire les marqueurs existants
             Object.values(markers).forEach(marker => marker.remove());
             markers = {};
@@ -470,8 +539,8 @@
                             // Créer un élément img pour l'icône personnalisée
                             const el = document.createElement('img');
                             el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                            el.style.width = '2%'; // Ajustez la taille selon vos besoins
-                            el.style.height = '2%';
+                            el.style.width = '2.5%'; // Ajustez la taille selon vos besoins
+                            el.style.height = '2.5%';
                             el.style.objectFit = 'cover'; // Pour s'assurer que l'image est bien ajustée
 
                             marker = new mapboxgl.Marker(el) // Utiliser l'élément personnalisé
@@ -533,143 +602,153 @@
         }
 
         // Ajouter des écouteurs pour les boutons de basculement
-        document.getElementById('toggle-controls').addEventListener('click', () => {
-            document.getElementById('controls-container').classList.toggle('active');
-        });
+        function setupToggleButtons() {
+            document.getElementById('toggle-controls').addEventListener('click', () => {
+                document.getElementById('controls-container').classList.toggle('active');
+            });
 
-        document.getElementById('toggle-depot').addEventListener('click', () => {
-            document.getElementById('depot-container').classList.toggle('active');
-        });
+            document.getElementById('toggle-depot').addEventListener('click', () => {
+                document.getElementById('depot-container').classList.toggle('active');
+            });
+        }
 
         // Ajouter un écouteur pour le switch de la vue de la carte
-        document.getElementById('map-switch').addEventListener('change', (event) => {
-            if (event.target.checked) {
-                // Changer en vue satellite
-                map.setStyle('mapbox://styles/mapbox/satellite-v9');
-            } else {
-                // Changer en vue streets
-                map.setStyle('mapbox://styles/mapbox/streets-v11');
-            }
-        });
+        function setupMapSwitch() {
+            document.getElementById('map-switch').addEventListener('change', (event) => {
+                if (event.target.checked) {
+                    // Changer en vue satellite
+                    map.setStyle('mapbox://styles/mapbox/satellite-v9');
+                } else {
+                    // Changer en vue streets
+                    map.setStyle('mapbox://styles/mapbox/streets-v11');
+                }
+            });
+        }
 
         // Ajouter un écouteur pour la barre de recherche
-        document.getElementById('search-button').addEventListener('click', () => {
-            const query = document.getElementById('search-input').value;
-            if (query.trim() === '') {
-                alert('Veuillez entrer une adresse à rechercher.');
-                return;
-            }
-
-            // Utiliser l'API de géocodage de Mapbox
-            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxgl.accessToken}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.features.length === 0) {
-                        alert('Aucun résultat trouvé pour cette adresse.');
-                        return;
-                    }
-
-                    // Prendre le premier résultat
-                    const firstResult = data.features[0];
-                    const [lng, lat] = firstResult.center;
-
-                    // Centrer la carte sur le résultat
-                    map.flyTo({ center: [lng, lat], zoom: 14 });
-
-                    // Supprimer l'ancien marqueur de recherche s'il existe
-                    if (searchMarker) {
-                        searchMarker.remove();
-                    }
-
-                    // Ajouter un marqueur pour le résultat
-                    searchMarker = new mapboxgl.Marker({ color: 'red' })
-                        .setLngLat([lng, lat])
-                        .setPopup(new mapboxgl.Popup().setHTML(`<strong>Résultat:</strong> ${firstResult.place_name}`))
-                        .addTo(map)
-                        .togglePopup();
-
-                    console.log(`Adresse trouvée: ${firstResult.place_name} à [${lng}, ${lat}]`);
-                })
-                .catch(error => {
-                    console.error('Erreur lors de la géocodage:', error);
-                    alert('Une erreur est survenue lors de la recherche de l\'adresse.');
-                });
-        });
-
-        // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
-        map.on('click', () => {
-            if (searchMarker) {
-                searchMarker.remove();
-                searchMarker = null;
-            }
-            // Supprimer le trajet si il existe
-            removeRoute();
-            // Supprimer la timeline si elle est affichée
-            hideTimeline();
-            // Supprimer le marqueur de la timeline
-            if (timelineMarker) {
-                timelineMarker.remove();
-                timelineMarker = null;
-            }
-        });
-
-        // Fonction pour afficher la route du tracker sélectionné
-        document.getElementById('route-button').addEventListener('click', () => {
-            const trackerId = document.getElementById('tracker-select').value;
-            if (!trackerId) {
-                alert('Veuillez sélectionner un tracker pour afficher la route.');
-                return;
-            }
-
-            // Définir la période pour la journée actuelle
-            const now = new Date();
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
-
-            // Fetch the track data using the /api/positions endpoint with query parameters
-            fetch(`https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Basic ' + btoa('l.betrisey@solioz-merkli.ch:Clapton/1254'),
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    console.error("Erreur de la réponse :", response.statusText); // Ajout du log d'erreur
-                    throw new Error('Erreur lors de la récupération des données de la route.');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data.length) {
-                    alert('Aucune donnée de route disponible pour ce tracker aujourd\'hui.');
+        function setupSearch() {
+            document.getElementById('search-button').addEventListener('click', () => {
+                const query = document.getElementById('search-input').value;
+                if (query.trim() === '') {
+                    alert('Veuillez entrer une adresse à rechercher.');
                     return;
                 }
 
-                // Trier les données par timestamp pour s'assurer que les points sont dans l'ordre
-                data.sort((a, b) => new Date(a.time) - new Date(b.time));
+                // Utiliser l'API de géocodage de Mapbox
+                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.features.length === 0) {
+                            alert('Aucun résultat trouvé pour cette adresse.');
+                            return;
+                        }
 
-                // Préparer les coordonnées pour la ligne
-                const coordinates = data.map(position => [parseFloat(position.longitude), parseFloat(position.latitude)]);
+                        // Prendre le premier résultat
+                        const firstResult = data.features[0];
+                        const [lng, lat] = firstResult.center;
 
-                // Stocker les données pour la timeline en utilisant deviceTime directement
-                timelineData = data.map(position => ({
-                    time: new Date(position.deviceTime), // Utilise directement deviceTime sans modification
-                    coordinates: [parseFloat(position.longitude), parseFloat(position.latitude)]
-                }));
+                        // Centrer la carte sur le résultat
+                        map.flyTo({ center: [lng, lat], zoom: 14 });
 
-                // Ajouter la ligne à la carte
-                addRouteToMap(coordinates);
+                        // Supprimer l'ancien marqueur de recherche s'il existe
+                        if (searchMarker) {
+                            searchMarker.remove();
+                        }
 
-                // Initialiser la timeline
-                initializeTimeline();
-            })
-            .catch(error => {
-                console.error('Erreur lors de la récupération des données de la route:', error);
-                alert('Une erreur est survenue lors de la récupération des données de la route.');
+                        // Ajouter un marqueur pour le résultat
+                        searchMarker = new mapboxgl.Marker({ color: 'red' })
+                            .setLngLat([lng, lat])
+                            .setPopup(new mapboxgl.Popup().setHTML(`<strong>Résultat:</strong> ${firstResult.place_name}`))
+                            .addTo(map)
+                            .togglePopup();
+
+                        console.log(`Adresse trouvée: ${firstResult.place_name} à [${lng}, ${lat}]`);
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors de la géocodage:', error);
+                        alert('Une erreur est survenue lors de la recherche de l\'adresse.');
+                    });
             });
-        });
+        }
+
+        // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
+        function setupMapClickListener() {
+            map.on('click', () => {
+                if (searchMarker) {
+                    searchMarker.remove();
+                    searchMarker = null;
+                }
+                // Supprimer le trajet si il existe
+                removeRoute();
+                // Supprimer la timeline si elle est affichée
+                hideTimeline();
+                // Supprimer le marqueur de la timeline
+                if (timelineMarker) {
+                    timelineMarker.remove();
+                    timelineMarker = null;
+                }
+            });
+        }
+
+        // Fonction pour afficher la route du tracker sélectionné
+        function setupRouteButton() {
+            document.getElementById('route-button').addEventListener('click', () => {
+                const trackerId = document.getElementById('tracker-select').value;
+                if (!trackerId) {
+                    alert('Veuillez sélectionner un tracker pour afficher la route.');
+                    return;
+                }
+
+                // Définir la période pour la journée actuelle
+                const now = new Date();
+                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+                const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+
+                // Fetch the track data using the /api/positions endpoint avec paramètres de requête
+                fetch(`https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable définie
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        console.error("Erreur de la réponse :", response.statusText); // Ajout du log d'erreur
+                        throw new Error('Erreur lors de la récupération des données de la route.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.length) {
+                        alert('Aucune donnée de route disponible pour ce tracker aujourd\'hui.');
+                        return;
+                    }
+
+                    // Trier les données par timestamp pour s'assurer que les points sont dans l'ordre
+                    data.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+                    // Préparer les coordonnées pour la ligne
+                    const coordinates = data.map(position => [parseFloat(position.longitude), parseFloat(position.latitude)]);
+
+                    // Stocker les données pour la timeline en utilisant deviceTime directement
+                    timelineData = data.map(position => ({
+                        time: new Date(position.deviceTime), // Utilise directement deviceTime sans modification
+                        coordinates: [parseFloat(position.longitude), parseFloat(position.latitude)]
+                    }));
+
+                    // Ajouter la ligne à la carte
+                    addRouteToMap(coordinates);
+
+                    // Initialiser la timeline
+                    initializeTimeline();
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la récupération des données de la route:', error);
+                    alert('Une erreur est survenue lors de la récupération des données de la route.');
+                });
+            });
+        }
 
         // Fonction pour ajouter la route à la carte
         function addRouteToMap(coordinates) {
@@ -709,10 +788,10 @@
 
         // Fonction pour supprimer la route de la carte
         function removeRoute() {
-            if (map.getLayer(routeLayerId)) {
+            if (map && map.getLayer(routeLayerId)) {
                 map.removeLayer(routeLayerId);
             }
-            if (map.getSource(routeLayerId)) {
+            if (map && map.getSource(routeLayerId)) {
                 map.removeSource(routeLayerId);
             }
             console.log('Route supprimée de la carte.');
@@ -793,8 +872,61 @@
             return `${hours}:${minutes}:${seconds}`;
         }
 
-        // Appel de la fonction pour récupérer et afficher les données des trackers
-        getTrackersData();
+        // Fonction pour initialiser la carte après la saisie des identifiants
+        function initializeMap() {
+            mapboxgl.accessToken = MAPBOX_API_KEY;
+
+            // Initialisation de la carte
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [7.475422, 46.257917], // Coordonnées de départ (Rue des Etreys 38 à Grône)
+                zoom: 14
+            });
+
+            // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
+            setupMapClickListener();
+
+            // Initialiser les écouteurs des boutons
+            setupToggleButtons();
+            setupMapSwitch();
+            setupSearch();
+            setupRouteButton();
+
+            // Afficher les éléments de l'interface
+            document.getElementById('search-container').style.display = 'flex';
+            document.getElementById('toggle-controls').style.display = 'flex';
+            document.getElementById('toggle-depot').style.display = 'flex';
+            document.getElementById('map-switch-container').style.display = 'flex';
+        }
+
+        // Gestion du formulaire de connexion
+        document.getElementById('credentials-form').addEventListener('submit', (event) => {
+            event.preventDefault();
+            
+            // Récupérer les valeurs du formulaire
+            const mapboxKeyInput = document.getElementById('mapbox-key').value.trim();
+            const traccarUsername = document.getElementById('traccar-username').value.trim();
+            const traccarPassword = document.getElementById('traccar-password').value.trim();
+
+            if (!mapboxKeyInput || !traccarUsername || !traccarPassword) {
+                alert('Veuillez remplir tous les champs.');
+                return;
+            }
+
+            // Stocker les identifiants
+            MAPBOX_API_KEY = mapboxKeyInput;
+            TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
+
+            // Fermer le modal
+            document.getElementById('credentials-modal').style.display = 'none';
+
+            // Initialiser la carte
+            initializeMap();
+
+            // Appeler la fonction pour récupérer et afficher les données des trackers
+            getTrackersData();
+        });
     </script>
 </body>
 </html>
