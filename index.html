@@ -95,7 +95,7 @@
             justify-content: center;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
             font-size: 20px;
-            user-select: none;
+            -webkit-user-select: none;
         }
         #toggle-controls {
             left: 20px;
@@ -264,7 +264,7 @@
             font-weight: bold;
         }
         #credentials-form input {
-            width: 100%;
+            width: 94%;
             padding: 8px;
             margin-bottom: 15px;
             border: 1px solid #ccc;
@@ -539,9 +539,13 @@
                             // Créer un élément img pour l'icône personnalisée
                             const el = document.createElement('img');
                             el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                            el.style.width = '2.5%'; // Ajustez la taille selon vos besoins
-                            el.style.height = '2.5%';
-                            el.style.objectFit = 'cover'; // Pour s'assurer que l'image est bien ajustée
+                            el.style.width = '3%'; // Ajustez la taille selon vos besoins
+                            el.style.height = '3%';
+                            el.style.objectFit = 'contain'; // Assure l'affichage complet sans rognage
+                            el.style.margin = '0'; // Évite le rognage dû aux marges
+                            el.style.padding = '0'; // Évite le rognage dû aux espaces intérieurs
+                            document.body.appendChild(el); // Assure que l'image est ajoutée au DOM
+
 
                             marker = new mapboxgl.Marker(el) // Utiliser l'élément personnalisé
                                 .setLngLat([tracker.longitude, tracker.latitude])
