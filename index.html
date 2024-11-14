@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carte Mapbox avec Trackers Traccar</title>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
@@ -14,12 +14,11 @@
             height: 100%;
             overflow: hidden;
             font-family: Arial, sans-serif;
-            position: fixed; /* Assure que le contenu reste fixe et évite le glissement */
+            position: relative;
         }
         #map {
             width: 100%;
             height: 100%;
-            overflow: hidden; /* Empêche tout débordement dans cet élément */
         }
         /* Panneaux de contrôle */
         #controls-container, #depot-container {
@@ -35,8 +34,7 @@
             padding: 20px;
             box-sizing: border-box;
             transition: transform 0.3s ease;
-            z-index: 1000;
-            overflow-y: auto; /* Ajouté pour permettre le défilement si contenu trop long */
+            z-index: 10;
         }
         #controls-container {
             left: 0;
@@ -99,7 +97,6 @@
             box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
             font-size: 20px;
             -webkit-user-select: none;
-            user-select: none;
         }
         #toggle-controls {
             left: 20px;
@@ -107,6 +104,7 @@
         #toggle-depot {
             right: 20px;
         }
+
         /* Liste "Dépôt" */
         #depot-content ul {
             list-style: none;
@@ -154,7 +152,7 @@
             cursor: pointer;
         }
         /* Style pour descendre les contrôles de navigation en haut à droite */
-        .mapboxgl-ctrl-top-right {
+            .mapboxgl-ctrl-top-right {
             top: 25%;
         }
         /* Barre de recherche d'adresse et sélection de tracker */
@@ -170,6 +168,7 @@
             display: flex;
             align-items: center;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            /* Changement pour aligner les éléments horizontalement */
         }
         .search-bar {
             position: relative;
@@ -332,119 +331,6 @@
         #credentials-form button:hover {
             background: #0056b3;
         }
-
-        /* Media Queries pour les écrans de 768px et moins (tablettes et mobiles) */
-        @media (max-width: 768px) {
-            /* Ajuster la largeur des panneaux de contrôle */
-            #controls-container, #depot-container {
-                width: 80%; /* Réduire la largeur pour s'adapter aux petits écrans */
-            }
-            
-            /* Modifier la position des panneaux pour éviter de couvrir trop d'écran */
-            #controls-container {
-                top: 0;
-                left: 0;
-                transform: translateX(-100%);
-            }
-            #depot-container {
-                top: 0;
-                right: 0;
-                transform: translateX(100%);
-            }
-
-            /* Ajuster les titres des panneaux */
-            #controls-container h2, #depot-container h2 {
-                margin-top: 20px; /* Réduire la marge supérieure */
-                font-size: 1em;
-            }
-
-            /* Modifier la barre de recherche pour qu'elle prenne plus de place */
-            #search-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            /* Ajuster la largeur des éléments de la barre de recherche */
-            #search-input {
-                width: 100%;
-                margin-bottom: 10px;
-            }
-            #tracker-select, #route-button {
-                width: 100%;
-                margin-left: 0;
-                margin-bottom: 10px;
-            }
-
-            /* Ajuster la position des boutons de basculement */
-            .toggle-button {
-                width: 35px;
-                height: 35px;
-                font-size: 18px;
-            }
-
-            /* Ajuster la position de la timeline */
-            #timeline-container {
-                width: 100%;
-            }
-
-            /* Afficher les contrôles de navigation en bas à droite pour éviter de couvrir les éléments importants */
-            .mapboxgl-ctrl-top-right {
-                top: auto;
-                bottom: 20%;
-            }
-        }
-
-        /* Media Queries pour les écrans de 480px et moins (smartphones) */
-        @media (max-width: 480px) {
-            /* Réduire davantage la largeur des panneaux de contrôle */
-            #controls-container, #depot-container {
-                width: 90%;
-            }
-
-            /* Réduire la taille des polices pour une meilleure lisibilité */
-            #controls-container h2, #depot-container h2 {
-                font-size: 1em;
-            }
-
-            /* Ajuster les paddings */
-            #controls-container, #depot-container {
-                padding: 15px;
-            }
-
-            /* Ajuster la taille des boutons et des éléments interactifs */
-            #search-button, #route-button, .toggle-button {
-                font-size: 16px;
-                padding: 10px;
-            }
-
-            /* Ajuster la taille des éléments de la timeline */
-            #timeline {
-                width: 90%;
-            }
-
-            /* Réduire la taille des marqueurs de la timeline */
-            .timeline-marker {
-                width: 10px;
-                height: 10px;
-            }
-
-            /* Ajuster la barre de recherche */
-            .search-bar {
-                max-width: 100%;
-            }
-        }
-
-        /* Améliorations supplémentaires pour une meilleure expérience tactile */
-        /* Augmenter la taille des zones cliquables */
-        label, button, select {
-            min-height: 40px;
-            padding: 10px;
-        }
-
-        /* Assurer un bon espacement entre les éléments */
-        #controls-content, #depot-content, #search-container {
-            margin-bottom: 10px;
-        }
     </style>
 </head>
 <body>
@@ -549,6 +435,10 @@
         // Références aux éléments de recherche et de suggestion
         const searchInput = document.getElementById('search-input');
         const suggestionsList = document.getElementById('suggestions-list');
+
+        // Intervalle de mise à jour des positions en millisecondes (e.g., 10000 ms = 10 secondes)
+        const UPDATE_INTERVAL = 10000; // 10 secondes
+        let updateIntervalId = null; // ID de l'intervalle pour pouvoir le nettoyer si nécessaire
 
         // Fonction de calcul de distance (Haversine)
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
@@ -792,53 +682,16 @@
             }
         }
 
-// Ajouter des écouteurs pour les boutons de basculement
-function setupToggleButtons() {
-    const toggleControls = document.getElementById('toggle-controls');
-    const toggleDepot = document.getElementById('toggle-depot');
-    const controls = document.getElementById('controls-container');
-    const depot = document.getElementById('depot-container');
+        // Ajouter des écouteurs pour les boutons de basculement
+        function setupToggleButtons() {
+            document.getElementById('toggle-controls').addEventListener('click', () => {
+                document.getElementById('controls-container').classList.toggle('active');
+            });
 
-    toggleControls.addEventListener('click', (event) => {
-        controls.classList.toggle('active');
-        
-        // Fermer le panneau Dépôt si ouvert
-        if (depot.classList.contains('active')) {
-            depot.classList.remove('active');
+            document.getElementById('toggle-depot').addEventListener('click', () => {
+                document.getElementById('depot-container').classList.toggle('active');
+            });
         }
-
-        // Empêcher la propagation pour éviter la fermeture immédiate
-        event.stopPropagation();
-    });
-
-    toggleDepot.addEventListener('click', (event) => {
-        depot.classList.toggle('active');
-        
-        // Fermer le panneau Contrôles si ouvert
-        if (controls.classList.contains('active')) {
-            controls.classList.remove('active');
-        }
-
-        // Empêcher la propagation pour éviter la fermeture immédiate
-        event.stopPropagation();
-    });
-
-    // Ajouter un écouteur de clic global pour fermer les panneaux en cliquant à l'extérieur
-    document.addEventListener('click', (event) => {
-        const isClickOutsideControls = !controls.contains(event.target) && event.target !== toggleControls;
-        const isClickOutsideDepot = !depot.contains(event.target) && event.target !== toggleDepot;
-
-        // Fermer le panneau de contrôle s'il est actif et qu'on clique à l'extérieur
-        if (controls.classList.contains('active') && isClickOutsideControls) {
-            controls.classList.remove('active');
-        }
-
-        // Fermer le panneau de dépôt s'il est actif et qu'on clique à l'extérieur
-        if (depot.classList.contains('active') && isClickOutsideDepot) {
-            depot.classList.remove('active');
-        }
-    });
-}
 
         // Ajouter un écouteur pour le switch de la vue de la carte
         function setupMapSwitch() {
@@ -1176,6 +1029,7 @@ function setupToggleButtons() {
 
             // Ajouter des contrôles de navigation en haut à droite
             map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+            
 
             // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
             setupMapClickListener();
@@ -1191,6 +1045,12 @@ function setupToggleButtons() {
             document.getElementById('toggle-controls').style.display = 'flex';
             document.getElementById('toggle-depot').style.display = 'flex';
             document.getElementById('map-switch-container').style.display = 'flex';
+
+            // Appeler la fonction pour récupérer et afficher les données des trackers
+            getTrackersData();
+
+            // Mettre en place la mise à jour périodique des positions
+            updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
         }
 
         // Gestion du formulaire de connexion
@@ -1216,9 +1076,19 @@ function setupToggleButtons() {
 
             // Initialiser la carte
             initializeMap();
+        });
 
-            // Appeler la fonction pour récupérer et afficher les données des trackers
-            getTrackersData();
+        // Fonction pour arrêter la mise à jour périodique si nécessaire
+        function stopUpdatingPositions() {
+            if (updateIntervalId) {
+                clearInterval(updateIntervalId);
+                updateIntervalId = null;
+            }
+        }
+
+        // Nettoyer l'intervalle lorsque la page est déchargée
+        window.addEventListener('beforeunload', () => {
+            stopUpdatingPositions();
         });
     </script>
 </body>
