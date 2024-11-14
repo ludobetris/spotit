@@ -402,6 +402,18 @@
                 width: 90%;
             }
 
+            /* Modifier la position des panneaux pour éviter de couvrir trop d'écran */
+            #controls-container {
+                top: 50px;
+                left: 0;
+                transform: translateX(-100%);
+            }
+            #depot-container {
+                top: 50px;
+                right: 0;
+                transform: translateX(100%);
+            }
+
             /* Réduire la taille des polices pour une meilleure lisibilité */
             #controls-container h2, #depot-container h2 {
                 font-size: 1em;
