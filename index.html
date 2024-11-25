@@ -338,8 +338,9 @@
         /* Style pour les marqueurs de beacons */
         .beacon-marker {
             background-color: blue;
-            width: 40px;
-            height: 40px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
         }
 
         /* Media Queries pour les écrans de 768px et moins (tablettes et mobiles) */
@@ -667,8 +668,8 @@
                             const beaconId = `${namespaceId}-${instanceId}`;
 
                             // Décaler légèrement la position du beacon pour éviter le chevauchement avec le tracker
-                            const offsetLng = 0.0001; // Approx. 10 mètres
-                            const offsetLat = 0.0001; // Approx. 10 mètres
+                            const offsetLng = 0.00006; // Approx. 6 mètres
+                            const offsetLat = 0.00006; // Approx. 6 mètres
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
@@ -898,10 +899,9 @@
                         if (beacon.iconUrl) {
                             el = document.createElement('img');
                             el.src = beacon.iconUrl;
-                            el.style.width = '30px'; // Taille ajustable selon vos besoins
-                            el.style.height = '30px';
+                            el.style.width = '70px'; // Taille ajustable selon vos besoins
+                            el.style.height = '70px';
                             el.style.objectFit = 'contain'; // Assure l'affichage complet sans rognage
-                            el.style.borderRadius = '50%'; // Pour des icônes circulaires, si nécessaire
                         } else {
                             el = document.createElement('div');
                             el.className = 'beacon-marker';
