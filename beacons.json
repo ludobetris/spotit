@@ -1,0 +1,15 @@
+[
+    {
+        "namespaceId": "namespace1",
+        "name": "Beacon Alpha"
+    },
+    {
+        "namespaceId": "namespace2",
+        "name": "Beacon Bravo"
+    },
+    {
+        "namespaceId": "namespace3",
+        "name": "Beacon Charlie"
+    }
+    // Ajoutez d'autres beacons selon vos besoins
+]
