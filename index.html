@@ -674,10 +674,10 @@
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
                             // Trouver le nom du beacon à partir des définitions (comparaison insensible à la casse)
-                            let beaconName = `Beacon ${namespaceId} ${instanceId}`; // Nom par défaut
+                            let beaconName = beaconDef ? beaconDef.name : `Beacon ${namespaceId}`;
                             const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
                             if (beaconDef) {
-                                beaconName = `${beaconDef.name} ${instanceId}`;
+                                beaconName = beaconDef.name;
                             }
 
                             // Mettre à jour la position du beacon si c'est la dernière détection
