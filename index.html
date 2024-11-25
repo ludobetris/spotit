@@ -629,7 +629,7 @@
                 const deviceIdToInfo = {};
                 devicesData.forEach(device => {
                     deviceIdToInfo[device.id] = {
-                        name: device.name || Tracker ${device.id},
+                        name: device.name || `Tracker ${device.id}`,
                         group: device.groupId ? groupIdToName[device.groupId] || 'Autre' : 'Autre'
                     };
                 });
@@ -648,7 +648,7 @@
                 // 4. Assign name and group from devices data
                 trackers = positionsData.map(position => ({
                     ...position,
-                    name: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].name) || Tracker ${position.deviceId},
+                    name: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].name) || `Tracker ${position.deviceId}`,
                     group: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].group) || 'Autre',
                     latitude: parseFloat(position.latitude),
                     longitude: parseFloat(position.longitude),
@@ -658,14 +658,14 @@
                 // Traitement des beacons détectés par les trackers
                 positionsData.forEach(position => {
                     for (let i = 1; i <= 4; i++) {
-                        const namespaceKey = beacon${i}Namespace;
-                        const instanceKey = beacon${i}Instance;
-                        const rssiKey = beacon${i}Rssi;
+                        const namespaceKey = `beacon${i}Namespace`;
+                        const instanceKey = `beacon${i}Instance`;
+                        const rssiKey = `beacon${i}Rssi`;
 
                         if (position.attributes && position.attributes[namespaceKey] && position.attributes[instanceKey]) {
                             const namespaceId = position.attributes[namespaceKey];
                             const instanceId = position.attributes[instanceKey];
-                            const beaconId = ${namespaceId}-${instanceId};
+                            const beaconId = `${namespaceId}-${instanceId}`;
 
                             // Décaler légèrement la position du beacon pour éviter le chevauchement avec le tracker
                             const offsetLng = 0.0001; // Approx. 10 mètres
@@ -674,10 +674,10 @@
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
                             // Trouver le nom du beacon à partir des définitions (comparaison insensible à la casse)
-                            let beaconName = Beacon ${namespaceId} ${instanceId}; // Nom par défaut
+                            let beaconName = `Beacon ${namespaceId} ${instanceId}`; // Nom par défaut
                             const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
                             if (beaconDef) {
-                                beaconName = ${beaconDef.name} ${instanceId};
+                                beaconName = `${beaconDef.name} ${instanceId}`;
                             }
 
                             // Mettre à jour la position du beacon si c'est la dernière détection
@@ -755,7 +755,7 @@
             // Ajouter les trackers
             trackers.forEach(tracker => {
                 const option = document.createElement('option');
-                option.value = tracker-${tracker.deviceId};
+                option.value = `tracker-${tracker.deviceId}`;
                 option.textContent = tracker.name;
                 trackerSelect.appendChild(option);
             });
@@ -763,7 +763,7 @@
             // Ajouter les beacons
             Object.values(beacons).forEach(beacon => {
                 const option = document.createElement('option');
-                option.value = beacon-${beacon.id};
+                option.value = `beacon-${beacon.id}`;
                 option.textContent = beacon.name;
                 trackerSelect.appendChild(option);
             });
@@ -786,7 +786,7 @@
                 if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
                     // Centrer la carte sans changer le zoom
                     map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude] });
-                    console.log(Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId});
+                    console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
                 }
             } else if (type === 'beacon') {
                 const selectedBeacon = beacons[id];
@@ -794,7 +794,7 @@
                 if (selectedBeacon && selectedBeacon.latitude && selectedBeacon.longitude) {
                     // Centrer la carte sans changer le zoom
                     map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude] });
-                    console.log(Centrage de la carte sur le beacon ${selectedBeacon.name});
+                    console.log(`Centrage de la carte sur le beacon ${selectedBeacon.name}`);
                 }
             }
         }
@@ -837,19 +837,19 @@
 
                             marker = new mapboxgl.Marker(el) // Utiliser l'élément personnalisé
                                 .setLngLat([tracker.longitude, tracker.latitude])
-                                .setPopup(new mapboxgl.Popup().setHTML(<strong>Nom:</strong> ${tracker.name || "Inconnu"}))
+                                .setPopup(new mapboxgl.Popup().setHTML(`<strong>Nom:</strong> ${tracker.name || "Inconnu"}`))
                                 .addTo(map);
                         } else {
                             // Marqueur par défaut
                             marker = new mapboxgl.Marker()
                                 .setLngLat([tracker.longitude, tracker.latitude])
-                                .setPopup(new mapboxgl.Popup().setHTML(<strong>Nom:</strong> ${tracker.name || "Inconnu"}))
+                                .setPopup(new mapboxgl.Popup().setHTML(`<strong>Nom:</strong> ${tracker.name || "Inconnu"}`))
                                 .addTo(map);
                         }
                         markers[tracker.deviceId] = marker;
-                        console.log(Ajout du tracker ${tracker.name || tracker.deviceId} au groupe ${groupe});
+                        console.log(`Ajout du tracker ${tracker.name || tracker.deviceId} au groupe ${groupe}`);
                     } else {
-                        console.warn(Tracker ${tracker.name || tracker.deviceId} a des coordonnées invalides.);
+                        console.warn(`Tracker ${tracker.name || tracker.deviceId} a des coordonnées invalides.`);
                     }
                 }
             });
@@ -864,13 +864,13 @@
 
                         const marker = new mapboxgl.Marker(el)
                             .setLngLat([beacon.longitude, beacon.latitude])
-                            .setPopup(new mapboxgl.Popup().setHTML(<strong>Nom:</strong> ${beacon.name || "Beacon"}<br><strong>RSSI:</strong> ${beacon.rssi}))
+                            .setPopup(new mapboxgl.Popup().setHTML(`<strong>Nom:</strong> ${beacon.name || "Beacon"}<br><strong>RSSI:</strong> ${beacon.rssi}`))
                             .addTo(map);
 
                         beaconMarkers[beacon.id] = marker;
-                        console.log(Ajout du beacon ${beacon.name} au groupe ${groupe});
+                        console.log(`Ajout du beacon ${beacon.name} au groupe ${groupe}`);
                     } else {
-                        console.warn(Beacon ${beacon.name} a des coordonnées invalides.);
+                        console.warn(`Beacon ${beacon.name} a des coordonnées invalides.`);
                     }
                 }
             });
@@ -889,17 +889,17 @@
                     item.latitude,
                     item.longitude
                 );
-                console.log(${item.name}: Distance = ${distance.toFixed(1)}m);
+                console.log(`${item.name}: Distance = ${distance.toFixed(1)}m`);
                 if (distance <= 200) {
                     const listItem = document.createElement('li');
 
                     // Créer un bouton pour rendre le tracker/beacon cliquable
                     const itemButton = document.createElement('button');
-                    itemButton.textContent = ${item.name} (${distance.toFixed(1)}m);
+                    itemButton.textContent = `${item.name} (${distance.toFixed(1)}m)`;
                     itemButton.addEventListener('click', () => {
                         if (item.longitude && item.latitude) {
                             map.flyTo({ center: [item.longitude, item.latitude] }); // Centrer sans zoom
-                            console.log(Centrage de la carte sur ${isBeacon ? 'le beacon' : 'le tracker'} ${item.name});
+                            console.log(`Centrage de la carte sur ${isBeacon ? 'le beacon' : 'le tracker'} ${item.name}`);
                             
                             // Ouvrir la popup associée si le marqueur existe
                             const marker = isBeacon ? beaconMarkers[item.id] : markers[item.deviceId];
@@ -970,7 +970,7 @@
 
         // Fonction pour afficher les suggestions
         function displaySuggestions(query) {
-            fetch(https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY})
+            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
                 .then(response => response.json())
                 .then(data => {
                     suggestionsList.innerHTML = ''; // Vider les suggestions précédentes
@@ -994,7 +994,7 @@
                                 }
                                 searchMarker = new mapboxgl.Marker({ color: 'red' })
                                     .setLngLat([lng, lat])
-                                    .setPopup(new mapboxgl.Popup().setHTML(<strong>Résultat:</strong> ${feature.place_name}))
+                                    .setPopup(new mapboxgl.Popup().setHTML(`<strong>Résultat:</strong> ${feature.place_name}`))
                                     .addTo(map)
                                     .togglePopup();
 
@@ -1040,7 +1040,7 @@
                 }
 
                 // Utiliser l'API de géocodage de Mapbox
-                fetch(https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY})
+                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
                     .then(response => response.json())
                     .then(data => {
                         if (data.features.length === 0) {
@@ -1063,11 +1063,11 @@
                         // Ajouter un marqueur pour le résultat
                         searchMarker = new mapboxgl.Marker({ color: 'red' })
                             .setLngLat([lng, lat])
-                            .setPopup(new mapboxgl.Popup().setHTML(<strong>Résultat:</strong> ${firstResult.place_name}))
+                            .setPopup(new mapboxgl.Popup().setHTML(`<strong>Résultat:</strong> ${firstResult.place_name}`))
                             .addTo(map)
                             .togglePopup();
 
-                        console.log(Adresse trouvée: ${firstResult.place_name} à [${lng}, ${lat}]);
+                        console.log(`Adresse trouvée: ${firstResult.place_name} à [${lng}, ${lat}]`);
                     })
                     .catch(error => {
                         console.error('Erreur lors de la géocodage:', error);
@@ -1115,7 +1115,7 @@
                     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
                     // Fetch the track data using the /api/positions endpoint avec paramètres de requête
-                    fetch(https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}, {
+                    fetch(`https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
                         method: 'GET',
                         headers: {
                             'Authorization': 'Basic ' + TRACCAR_AUTH, // Utiliser la variable définie
@@ -1282,7 +1282,7 @@
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
             const seconds = String(date.getSeconds()).padStart(2, '0');
-            return ${hours}:${minutes}:${seconds};
+            return `${hours}:${minutes}:${seconds}`;
         }
 
         // Fonction pour initialiser la carte après la saisie des identifiants
@@ -1357,7 +1357,7 @@
 
             // Stocker les identifiants
             MAPBOX_API_KEY = mapboxKeyInput;
-            TRACCAR_AUTH = btoa(${traccarUsername}:${traccarPassword});
+            TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
 
             // Initialiser checkedGroupsSet avec tous les groupes cochés par défaut
             // Nous le ferons après avoir récupéré les groupes
