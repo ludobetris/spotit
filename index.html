@@ -796,6 +796,12 @@
                     // Centrer la carte sans changer le zoom
                     map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude] });
                     console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
+
+                    // Ouvrir la popup associée si le marqueur existe
+                    const marker = markers[selectedTracker.deviceId];
+                    if (marker) {
+                        marker.togglePopup();
+                    }
                 }
             } else if (type === 'beacon') {
                 const selectedBeacon = beacons[id];
@@ -804,6 +810,12 @@
                     // Centrer la carte sans changer le zoom
                     map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude] });
                     console.log(`Centrage de la carte sur le beacon ${selectedBeacon.name}`);
+
+                    // Ouvrir la popup associée si le marqueur existe
+                    const marker = beaconMarkers[selectedBeacon.id];
+                    if (marker) {
+                        marker.togglePopup();
+                    }
                 }
             }
         }
