@@ -747,24 +747,33 @@
             });
         }
 
-        // Fonction pour peupler le sélecteur de trackers et beacons
+        // Fonction pour peupler le sélecteur de trackers et beacons triés par ordre alphabétique
         function populateTrackerSelect() {
             const trackerSelect = document.getElementById('tracker-select');
-            trackerSelect.innerHTML = '<option value="">Sélectionner un tracker ou beacon</option>'; // Reset options
+            trackerSelect.innerHTML = '<option value="">Sélectionner un tracker ou beacon</option>'; // Réinitialiser les options
 
-            // Ajouter les trackers
-            trackers.forEach(tracker => {
-                const option = document.createElement('option');
-                option.value = `tracker-${tracker.deviceId}`;
-                option.textContent = tracker.name;
-                trackerSelect.appendChild(option);
-            });
+            // Combiner trackers et beacons dans une seule liste avec un champ 'type'
+            const combinedList = [
+                ...trackers.map(tracker => ({
+                    type: 'tracker',
+                    id: tracker.deviceId,
+                    name: tracker.name
+                })),
+                ...Object.values(beacons).map(beacon => ({
+                    type: 'beacon',
+                    id: beacon.id,
+                    name: beacon.name
+                }))
+            ];
 
-            // Ajouter les beacons
-            Object.values(beacons).forEach(beacon => {
+            // Trier la liste combinée par nom (ordre alphabétique)
+            combinedList.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Ajouter les options triées au sélecteur
+            combinedList.forEach(item => {
                 const option = document.createElement('option');
-                option.value = `beacon-${beacon.id}`;
-                option.textContent = beacon.name;
+                option.value = `${item.type}-${item.id}`;
+                option.textContent = item.name;
                 trackerSelect.appendChild(option);
             });
 
@@ -773,7 +782,7 @@
             trackerSelect.addEventListener('change', trackerSelectChangeHandler);
         }
 
-        // Gestionnaire d'événement pour le sélecteur de tracker
+        // Gestionnaire d'événement pour le sélecteur de tracker/beacon
         function trackerSelectChangeHandler(event) {
             const selectedValue = event.target.value;
             if (!selectedValue) return;
