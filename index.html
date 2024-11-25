@@ -577,6 +577,9 @@
         const UPDATE_INTERVAL = 10000; // 10 secondes
         let updateIntervalId = null; // ID de l'intervalle pour pouvoir le nettoyer si nécessaire
 
+        // Ensemble pour conserver les groupes cochés
+        let checkedGroupsSet = new Set();
+
         // Fonction de calcul de distance (Haversine)
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3; // Rayon de la Terre en mètres
@@ -703,10 +706,25 @@
             uniqueGroups.forEach(groupe => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.checked = true;
                 checkbox.classList.add('group-checkbox');
                 checkbox.dataset.groupe = groupe;
-                checkbox.addEventListener('change', updateMap);
+
+                // Définir l'état du checkbox en fonction de checkedGroupsSet
+                if (checkedGroupsSet.has(groupe)) {
+                    checkbox.checked = true;
+                } else {
+                    checkbox.checked = false;
+                }
+
+                // Ajouter un écouteur pour mettre à jour checkedGroupsSet
+                checkbox.addEventListener('change', (event) => {
+                    if (event.target.checked) {
+                        checkedGroupsSet.add(groupe);
+                    } else {
+                        checkedGroupsSet.delete(groupe);
+                    }
+                    updateMap();
+                });
 
                 const label = document.createElement('label');
                 label.textContent = groupe;
@@ -738,28 +756,34 @@
             });
 
             // Ajouter un écouteur de changement sur le sélecteur de tracker
-            trackerSelect.addEventListener('change', (event) => {
-                const selectedValue = event.target.value;
-                if (!selectedValue) return;
+            trackerSelect.removeEventListener('change', trackerSelectChangeHandler); // Éviter les doublons
+            trackerSelect.addEventListener('change', trackerSelectChangeHandler);
+        }
 
-                const [type, id] = selectedValue.includes('-') ? selectedValue.split('-') : ['tracker', selectedValue];
+        // Gestionnaire d'événement pour le sélecteur de tracker
+        function trackerSelectChangeHandler(event) {
+            const selectedValue = event.target.value;
+            if (!selectedValue) return;
 
-                if (type === 'tracker') {
-                    const selectedTracker = trackers.find(tracker => tracker.deviceId == id);
+            const [type, id] = selectedValue.includes('-') ? selectedValue.split('-') : ['tracker', selectedValue];
 
-                    if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
-                        map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude], zoom: 14 });
-                        console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
-                    }
-                } else if (type === 'beacon') {
-                    const selectedBeacon = beacons[id];
+            if (type === 'tracker') {
+                const selectedTracker = trackers.find(tracker => tracker.deviceId == id);
 
-                    if (selectedBeacon && selectedBeacon.latitude && selectedBeacon.longitude) {
-                        map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude], zoom: 14 });
-                        console.log(`Centrage de la carte sur le beacon ${selectedBeacon.name}`);
-                    }
+                if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
+                    // Centrer la carte sans changer le zoom
+                    map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude] });
+                    console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
                 }
-            });
+            } else if (type === 'beacon') {
+                const selectedBeacon = beacons[id];
+
+                if (selectedBeacon && selectedBeacon.latitude && selectedBeacon.longitude) {
+                    // Centrer la carte sans changer le zoom
+                    map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude] });
+                    console.log(`Centrage de la carte sur le beacon ${selectedBeacon.name}`);
+                }
+            }
         }
 
         // Fonction pour mettre à jour la carte en fonction des groupes sélectionnés
@@ -778,8 +802,7 @@
             beaconMarkers = {};
 
             // Récupère les groupes cochés
-            const checkedGroups = Array.from(document.querySelectorAll('.group-checkbox:checked'))
-                .map(checkbox => checkbox.dataset.groupe);
+            const checkedGroups = Array.from(checkedGroupsSet);
             console.log('Groupes cochés:', checkedGroups);
 
             // Affiche les trackers des groupes cochés
@@ -862,7 +885,7 @@
                     itemButton.textContent = `${item.name} (${distance.toFixed(1)}m)`;
                     itemButton.addEventListener('click', () => {
                         if (item.longitude && item.latitude) {
-                            map.flyTo({ center: [item.longitude, item.latitude], zoom: 14 });
+                            map.flyTo({ center: [item.longitude, item.latitude] }); // Centrer sans zoom
                             console.log(`Centrage de la carte sur ${isBeacon ? 'le beacon' : 'le tracker'} ${item.name}`);
                             
                             // Ouvrir la popup associée si le marqueur existe
@@ -927,6 +950,8 @@
             map.on('style.load', () => {
                 // Réafficher les beacons
                 Object.values(beaconMarkers).forEach(marker => marker.addTo(map));
+                // Réafficher les trackers
+                Object.values(markers).forEach(marker => marker.addTo(map));
             });
         }
 
@@ -948,7 +973,7 @@
                             // Ajouter un événement de clic pour recentrer la carte sur la suggestion
                             suggestionItem.addEventListener('click', () => {
                                 const [lng, lat] = feature.center;
-                                map.flyTo({ center: [lng, lat], zoom: 14 });
+                                map.flyTo({ center: [lng, lat] });
                                 
                                 // Ajouter un marqueur pour le résultat
                                 if (searchMarker) {
@@ -1014,8 +1039,8 @@
                         const firstResult = data.features[0];
                         const [lng, lat] = firstResult.center;
 
-                        // Centrer la carte sur le résultat
-                        map.flyTo({ center: [lng, lat], zoom: 14 });
+                        // Centrer la carte sur le résultat sans zoom
+                        map.flyTo({ center: [lng, lat] });
 
                         // Supprimer l'ancien marqueur de recherche s'il existe
                         if (searchMarker) {
@@ -1223,8 +1248,8 @@
                         .addTo(map);
                 }
 
-                // Centrer la carte sur le marqueur de la timeline
-                map.jumpTo({ center: position.coordinates, zoom: 10 });
+                // Centrer la carte sur le marqueur de la timeline sans zoom
+                map.flyTo({ center: position.coordinates });
             });
         }
 
@@ -1262,7 +1287,6 @@
             // Ajouter des contrôles de navigation en haut à droite
             map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-
             // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
             setupMapClickListener();
 
@@ -1277,6 +1301,13 @@
             document.getElementById('toggle-controls').style.display = 'flex';
             document.getElementById('toggle-depot').style.display = 'flex';
             document.getElementById('map-switch-container').style.display = 'flex';
+
+            // Initialiser checkedGroupsSet avec tous les groupes cochés par défaut
+            // Inclure 'Beacons' par défaut
+            if (checkedGroupsSet.size === 0) {
+                // Après avoir récupéré les groupes et beacons, ils seront ajoutés
+                // Donc, ne pas initialiser ici
+            }
 
             // Appeler la fonction pour récupérer et afficher les données des trackers après le chargement de la carte
             map.on('load', () => {
@@ -1304,6 +1335,9 @@
             // Stocker les identifiants
             MAPBOX_API_KEY = mapboxKeyInput;
             TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
+
+            // Initialiser checkedGroupsSet avec tous les groupes cochés par défaut
+            // Nous le ferons après avoir récupéré les groupes
 
             // Fermer le modal
             document.getElementById('credentials-modal').style.display = 'none';
