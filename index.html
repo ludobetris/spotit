@@ -7,6 +7,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <style>
+        /* Styles existants inchangés */
         body, html {
             margin: 0;
             padding: 0;
@@ -559,6 +560,9 @@
         let beacons = {}; // Pour stocker les beacons
         let beaconMarkers = {}; // Pour stocker les marqueurs des beacons
 
+        // Définir une variable pour stocker les définitions des beacons
+        let beaconDefinitions = [];
+
         // Coordonnées de référence pour "Rue des Etreys 38 à Grône"
         const depotCoordinates = [7.475422, 46.257917]; // [longitude, latitude]
 
@@ -659,7 +663,9 @@
                         const rssiKey = `beacon${i}Rssi`;
 
                         if (position.attributes && position.attributes[namespaceKey] && position.attributes[instanceKey]) {
-                            const beaconId = `${position.attributes[namespaceKey]}-${position.attributes[instanceKey]}`;
+                            const namespaceId = position.attributes[namespaceKey];
+                            const instanceId = position.attributes[instanceKey];
+                            const beaconId = `${namespaceId}-${instanceId}`;
 
                             // Décaler légèrement la position du beacon pour éviter le chevauchement avec le tracker
                             const offsetLng = 0.0001; // Approx. 10 mètres
@@ -667,11 +673,18 @@
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
+                            // Trouver le nom du beacon à partir des définitions
+                            let beaconName = `Beacon ${namespaceId} ${instanceId}`; // Nom par défaut
+                            const beaconDef = beaconDefinitions.find(b => b.namespaceId === namespaceId);
+                            if (beaconDef) {
+                                beaconName = beaconDef.name;
+                            }
+
                             // Mettre à jour la position du beacon si c'est la dernière détection
                             if (!beacons[beaconId] || new Date(position.deviceTime) > new Date(beacons[beaconId].lastSeen)) {
                                 beacons[beaconId] = {
                                     id: beaconId,
-                                    name: `Beacon ${position.attributes[namespaceKey]} ${position.attributes[instanceKey]}`,
+                                    name: beaconName,
                                     latitude: beaconLat,
                                     longitude: beaconLng,
                                     lastSeen: position.deviceTime,
@@ -1274,48 +1287,53 @@
 
         // Fonction pour initialiser la carte après la saisie des identifiants
         function initializeMap() {
-            mapboxgl.accessToken = MAPBOX_API_KEY;
+            // Charger les définitions des beacons depuis GitHub
+            fetch('https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json')
+                .then(response => response.json())
+                .then(data => {
+                    beaconDefinitions = data; // Stocker les définitions des beacons
+                    console.log('Définitions des beacons chargées:', beaconDefinitions);
 
-            // Initialisation de la carte
-            map = new mapboxgl.Map({
-                container: 'map',
-                style: 'mapbox://styles/mapbox/streets-v11',
-                center: [7.475422, 46.257917], // Coordonnées de départ (Rue des Etreys 38 à Grône)
-                zoom: 14
-            });
+                    mapboxgl.accessToken = MAPBOX_API_KEY;
 
-            // Ajouter des contrôles de navigation en haut à droite
-            map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                    // Initialisation de la carte
+                    map = new mapboxgl.Map({
+                        container: 'map',
+                        style: 'mapbox://styles/mapbox/streets-v11',
+                        center: [7.475422, 46.257917], // Coordonnées de départ (Rue des Etreys 38 à Grône)
+                        zoom: 14
+                    });
 
-            // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
-            setupMapClickListener();
+                    // Ajouter des contrôles de navigation en haut à droite
+                    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-            // Initialiser les écouteurs des boutons
-            setupToggleButtons();
-            setupMapSwitch();
-            setupSearch();
-            setupRouteButton();
+                    // Ajouter un écouteur pour supprimer le marqueur de recherche et la route lorsque l'utilisateur clique sur la carte
+                    setupMapClickListener();
 
-            // Afficher les éléments de l'interface
-            document.getElementById('search-container').style.display = 'flex';
-            document.getElementById('toggle-controls').style.display = 'flex';
-            document.getElementById('toggle-depot').style.display = 'flex';
-            document.getElementById('map-switch-container').style.display = 'flex';
+                    // Initialiser les écouteurs des boutons
+                    setupToggleButtons();
+                    setupMapSwitch();
+                    setupSearch();
+                    setupRouteButton();
 
-            // Initialiser checkedGroupsSet avec tous les groupes cochés par défaut
-            // Inclure 'Beacons' par défaut
-            if (checkedGroupsSet.size === 0) {
-                // Après avoir récupéré les groupes et beacons, ils seront ajoutés
-                // Donc, ne pas initialiser ici
-            }
+                    // Afficher les éléments de l'interface
+                    document.getElementById('search-container').style.display = 'flex';
+                    document.getElementById('toggle-controls').style.display = 'flex';
+                    document.getElementById('toggle-depot').style.display = 'flex';
+                    document.getElementById('map-switch-container').style.display = 'flex';
 
-            // Appeler la fonction pour récupérer et afficher les données des trackers après le chargement de la carte
-            map.on('load', () => {
-                getTrackersData();
+                    // Appeler la fonction pour récupérer et afficher les données des trackers après le chargement de la carte
+                    map.on('load', () => {
+                        getTrackersData();
 
-                // Mettre en place la mise à jour périodique des positions
-                updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
-            });
+                        // Mettre en place la mise à jour périodique des positions
+                        updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
+                    });
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement des définitions de beacons:', error);
+                    alert('Une erreur est survenue lors du chargement des définitions de beacons.');
+                });
         }
 
         // Gestion du formulaire de connexion
