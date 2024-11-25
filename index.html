@@ -673,11 +673,14 @@
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
-                            // Trouver le nom du beacon à partir des définitions (comparaison insensible à la casse)
+                            // Trouver le nom et l'icône du beacon à partir des définitions (comparaison insensible à la casse)
                             let beaconName = `Beacon ${namespaceId} ${instanceId}`; // Nom par défaut
+                            let beaconIconUrl = null; // URL de l'icône personnalisée par défaut
+
                             const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
                             if (beaconDef) {
-                                beaconName = `${beaconDef.name}`;
+                                beaconName = beaconDef.name;
+                                beaconIconUrl = beaconDef.iconUrl || null; // Récupérer l'icône si elle existe
                             }
 
                             // Mettre à jour la position du beacon si c'est la dernière détection
@@ -689,7 +692,8 @@
                                     longitude: beaconLng,
                                     lastSeen: position.deviceTime,
                                     rssi: position.attributes[rssiKey],
-                                    group: 'Beacons'
+                                    group: 'Beacons',
+                                    iconUrl: beaconIconUrl // Ajouter l'URL de l'icône
                                 };
                             }
                         }
@@ -891,8 +895,18 @@
                 const groupe = beacon.group;
                 if (checkedGroups.includes(groupe)) {
                     if (typeof beacon.longitude === 'number' && typeof beacon.latitude === 'number') {
-                        const el = document.createElement('div');
-                        el.className = 'beacon-marker';
+                        let el;
+                        if (beacon.iconUrl) {
+                            el = document.createElement('img');
+                            el.src = beacon.iconUrl;
+                            el.style.width = '30px'; // Taille ajustable selon vos besoins
+                            el.style.height = '30px';
+                            el.style.objectFit = 'contain'; // Assure l'affichage complet sans rognage
+                            el.style.borderRadius = '50%'; // Pour des icônes circulaires, si nécessaire
+                        } else {
+                            el = document.createElement('div');
+                            el.className = 'beacon-marker';
+                        }
 
                         const marker = new mapboxgl.Marker(el)
                             .setLngLat([beacon.longitude, beacon.latitude])
