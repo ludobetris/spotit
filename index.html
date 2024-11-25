@@ -677,7 +677,7 @@
                             let beaconName = `Beacon ${namespaceId} ${instanceId}`; // Nom par défaut
                             const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
                             if (beaconDef) {
-                                beaconName = `beaconDef.name`;
+                                beaconName = `${beaconDef.name}`;
                             }
 
                             // Mettre à jour la position du beacon si c'est la dernière détection
