@@ -613,8 +613,10 @@
                 // Convertir en objet pour un accès rapide
                 beaconsDatabase = {};
                 data.forEach(beacon => {
-                    beaconsDatabase[beacon["Namespace ID"]] = beacon["Nom"];
+                    beaconsDatabase[beacon.namespaceId] = beacon.name;
                 });
+                console.log('Beacons Database:', beaconsDatabase);
+
             } catch (error) {
                 console.error('Erreur lors de la récupération de la base de données des beacons:', error);
                 alert('Une erreur est survenue lors de la récupération de la base de données des beacons.');
