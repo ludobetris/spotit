@@ -580,6 +580,13 @@
         // Ensemble pour conserver les groupes cochés
         let checkedGroupsSet = new Set();
 
+        // URL brute du fichier beacons.json hébergé sur GitHub
+        const BEACONS_DB_URL = 'https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json';
+        // Remplacez <votre_nom_d_utilisateur> et le chemin par les vôtres
+
+        // Objet pour stocker les noms des beacons depuis la base de données
+        let beaconsDatabase = {};
+
         // Fonction de calcul de distance (Haversine)
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3; // Rayon de la Terre en mètres
@@ -592,6 +599,26 @@
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const d = R * c;
             return d;
+        }
+
+        // Fonction pour récupérer la base de données des beacons depuis GitHub
+        async function fetchBeaconsDatabase() {
+            try {
+                const response = await fetch(BEACONS_DB_URL);
+                if (!response.ok) {
+                    throw new Error('Erreur lors de la récupération de la base de données des beacons.');
+                }
+                const data = await response.json();
+                console.log('Base de données des beacons reçue:', data);
+                // Convertir en objet pour un accès rapide
+                beaconsDatabase = {};
+                data.forEach(beacon => {
+                    beaconsDatabase[beacon["Namespace ID"]] = beacon["Nom"];
+                });
+            } catch (error) {
+                console.error('Erreur lors de la récupération de la base de données des beacons:', error);
+                alert('Une erreur est survenue lors de la récupération de la base de données des beacons.');
+            }
         }
 
         // Fonction pour obtenir les données des groupes, devices, et positions de Traccar
@@ -651,7 +678,8 @@
                     time: position.time // Assurez-vous que la propriété 'time' est présente
                 }));
 
-                // Traitement des beacons détectés par les trackers
+                // 5. Traitement des beacons détectés par les trackers
+                beacons = {}; // Réinitialiser les beacons
                 positionsData.forEach(position => {
                     for (let i = 1; i <= 4; i++) {
                         const namespaceKey = `beacon${i}Namespace`;
@@ -659,7 +687,13 @@
                         const rssiKey = `beacon${i}Rssi`;
 
                         if (position.attributes && position.attributes[namespaceKey] && position.attributes[instanceKey]) {
-                            const beaconId = `${position.attributes[namespaceKey]}-${position.attributes[instanceKey]}`;
+                            const namespaceId = position.attributes[namespaceKey];
+                            const beaconName = beaconsDatabase[namespaceId];
+
+                            // Si le beacon n'est pas dans la base de données, l'ignorer
+                            if (!beaconName) continue;
+
+                            const beaconId = `${namespaceId}-${position.attributes[instanceKey]}`;
 
                             // Décaler légèrement la position du beacon pour éviter le chevauchement avec le tracker
                             const offsetLng = 0.0001; // Approx. 10 mètres
@@ -671,7 +705,7 @@
                             if (!beacons[beaconId] || new Date(position.deviceTime) > new Date(beacons[beaconId].lastSeen)) {
                                 beacons[beaconId] = {
                                     id: beaconId,
-                                    name: `Beacon ${position.attributes[namespaceKey]} ${position.attributes[instanceKey]}`,
+                                    name: beaconName, // Utiliser le nom de la base de données
                                     latitude: beaconLat,
                                     longitude: beaconLng,
                                     lastSeen: position.deviceTime,
@@ -710,10 +744,16 @@
                 checkbox.dataset.groupe = groupe;
 
                 // Définir l'état du checkbox en fonction de checkedGroupsSet
-                if (checkedGroupsSet.has(groupe)) {
+                if (checkedGroupsSet.size === 0) {
+                    // Si c'est la première fois, cocher tous les groupes
+                    checkedGroupsSet.add(groupe);
                     checkbox.checked = true;
                 } else {
-                    checkbox.checked = false;
+                    if (checkedGroupsSet.has(groupe)) {
+                        checkbox.checked = true;
+                    } else {
+                        checkbox.checked = false;
+                    }
                 }
 
                 // Ajouter un écouteur pour mettre à jour checkedGroupsSet
@@ -946,7 +986,7 @@
                 }
             });
 
-            // Réajouter les marqueurs de beacons après le chargement du nouveau style
+            // Réajouter les marqueurs de beacons et trackers après le chargement du nouveau style
             map.on('style.load', () => {
                 // Réafficher les beacons
                 Object.values(beaconMarkers).forEach(marker => marker.addTo(map));
@@ -1273,7 +1313,7 @@
         }
 
         // Fonction pour initialiser la carte après la saisie des identifiants
-        function initializeMap() {
+        async function initializeMap() {
             mapboxgl.accessToken = MAPBOX_API_KEY;
 
             // Initialisation de la carte
@@ -1302,12 +1342,8 @@
             document.getElementById('toggle-depot').style.display = 'flex';
             document.getElementById('map-switch-container').style.display = 'flex';
 
-            // Initialiser checkedGroupsSet avec tous les groupes cochés par défaut
-            // Inclure 'Beacons' par défaut
-            if (checkedGroupsSet.size === 0) {
-                // Après avoir récupéré les groupes et beacons, ils seront ajoutés
-                // Donc, ne pas initialiser ici
-            }
+            // Récupérer la base de données des beacons avant de récupérer les trackers
+            await fetchBeaconsDatabase();
 
             // Appeler la fonction pour récupérer et afficher les données des trackers après le chargement de la carte
             map.on('load', () => {
@@ -1335,9 +1371,6 @@
             // Stocker les identifiants
             MAPBOX_API_KEY = mapboxKeyInput;
             TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
-
-            // Initialiser checkedGroupsSet avec tous les groupes cochés par défaut
-            // Nous le ferons après avoir récupéré les groupes
 
             // Fermer le modal
             document.getElementById('credentials-modal').style.display = 'none';
