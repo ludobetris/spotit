@@ -784,37 +784,52 @@
 
         // Gestionnaire d'événement pour le sélecteur de tracker/beacon
         function trackerSelectChangeHandler(event) {
-    const selectedValue = event.target.value;
-    if (!selectedValue) return;
+            const selectedValue = event.target.value;
+            if (!selectedValue) return;
 
-    const [type, id] = selectedValue.includes('-') ? selectedValue.split('-') : ['tracker', selectedValue];
-
-    if (type === 'tracker') {
-        const selectedTracker = trackers.find(tracker => tracker.deviceId == id);
-
-        if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
-            // Centrer la carte sans changer le zoom
-            map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude] });
-            console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
-        }
-    } else if (type === 'beacon') {
-        const selectedBeacon = beacons[id];
-
-        if (selectedBeacon && selectedBeacon.latitude && selectedBeacon.longitude) {
-            // Centrer la carte sans changer le zoom
-            map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude] });
-            console.log(`Centrage de la carte sur le beacon ${selectedBeacon.name}`);
-
-            // Ouvrir la popup associée si elle existe
-            const marker = beaconMarkers[selectedBeacon.id];
-            if (marker) {
-                marker.togglePopup();
+            // Correction : Split seulement au premier tiret pour éviter les problèmes avec les IDs contenant des tirets
+            const firstDashIndex = selectedValue.indexOf('-');
+            let type, id;
+            if (firstDashIndex === -1) {
+                type = 'tracker';
+                id = selectedValue;
+            } else {
+                type = selectedValue.substring(0, firstDashIndex);
+                id = selectedValue.substring(firstDashIndex + 1);
             }
-        } else {
-            console.warn(`Le beacon sélectionné (${id}) n'a pas de coordonnées valides.`);
+
+            if (type === 'tracker') {
+                const selectedTracker = trackers.find(tracker => tracker.deviceId == id);
+
+                if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
+                    // Centrer la carte sans changer le zoom
+                    map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude] });
+                    console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
+
+                    // Ouvrir la popup associée si elle existe
+                    const marker = markers[selectedTracker.deviceId];
+                    if (marker) {
+                        marker.togglePopup();
+                    }
+                }
+            } else if (type === 'beacon') {
+                const selectedBeacon = beacons[id];
+
+                if (selectedBeacon && selectedBeacon.latitude && selectedBeacon.longitude) {
+                    // Centrer la carte sans changer le zoom
+                    map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude] });
+                    console.log(`Centrage de la carte sur le beacon ${selectedBeacon.name}`);
+
+                    // Ouvrir la popup associée si elle existe
+                    const marker = beaconMarkers[selectedBeacon.id];
+                    if (marker) {
+                        marker.togglePopup();
+                    }
+                } else {
+                    console.warn(`Le beacon sélectionné (${id}) n'a pas de coordonnées valides.`);
+                }
+            }
         }
-    }
-}
 
         // Fonction pour mettre à jour la carte en fonction des groupes sélectionnés
         function updateMap() {
@@ -1121,7 +1136,15 @@
                     return;
                 }
 
-                const [type, id] = selectedValue.includes('-') ? selectedValue.split('-') : ['tracker', selectedValue];
+                const firstDashIndex = selectedValue.indexOf('-');
+                let type, id;
+                if (firstDashIndex === -1) {
+                    type = 'tracker';
+                    id = selectedValue;
+                } else {
+                    type = selectedValue.substring(0, firstDashIndex);
+                    id = selectedValue.substring(firstDashIndex + 1);
+                }
 
                 if (type === 'tracker') {
                     const trackerId = id;
