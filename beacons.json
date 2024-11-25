@@ -2,13 +2,16 @@
     {
         "namespaceId": "234C80ACD68055AACEF6",
         "name": "Dameuse 01"
+        "iconUrl": "https://github.com/ludobetris/3d-models/raw/main/pickup.png"
     },
     {
         "namespaceId": "namespace2",
         "name": "Beacon Bravo"
+        "iconUrl": "https://github.com/ludobetris/3d-models/raw/main/pickup.png"
     },
     {
         "namespaceId": "namespace3",
         "name": "Beacon Charlie"
+        "iconUrl": "https://github.com/ludobetris/3d-models/raw/main/pickup.png"
     }
 ]
