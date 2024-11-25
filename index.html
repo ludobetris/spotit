@@ -641,8 +641,8 @@
 
                 // Traitement des beacons détectés par les trackers
                 trackers.forEach(tracker => {
-                    if (tracker.beacon1Namespace && tracker.beacon1Instance) {
-                        const beaconId = `${tracker.beacon1Namespace}-${tracker.beacon1Instance}`;
+                    if (tracker.attributes && tracker.attributes.beacon1Namespace && tracker.attributes.beacon1Instance) {
+                        const beaconId = `${tracker.attributes.beacon1Namespace}-${tracker.attributes.beacon1Instance}`;
                         if (!beaconMarkers[beaconId]) {
                             // Calculer la position du beacon en décalant légèrement la position du tracker
                             const offsetLng = 0.0005; // Approx. 50 mètres
@@ -653,7 +653,7 @@
                             // Créer un marqueur pour le beacon
                             const beaconMarker = new mapboxgl.Marker({ color: 'blue' })
                                 .setLngLat([beaconLng, beaconLat])
-                                .setPopup(new mapboxgl.Popup().setHTML(`<strong>Beacon:</strong> ${beaconId}<br><strong>RSSI:</strong> ${tracker.beacon1Rssi}`))
+                                .setPopup(new mapboxgl.Popup().setHTML(`<strong>Beacon:</strong> ${beaconId}<br><strong>RSSI:</strong> ${tracker.attributes.beacon1Rssi}`))
                                 .addTo(map);
 
                             beaconMarkers[beaconId] = beaconMarker;
