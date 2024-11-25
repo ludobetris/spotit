@@ -673,11 +673,11 @@
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
-                            // Trouver le nom du beacon à partir des définitions
+                            // Trouver le nom du beacon à partir des définitions (comparaison insensible à la casse)
                             let beaconName = `Beacon ${namespaceId} ${instanceId}`; // Nom par défaut
-                            const beaconDef = beaconDefinitions.find(b => b.namespaceId === namespaceId);
+                            const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
                             if (beaconDef) {
-                                beaconName = beaconDef.name;
+                                beaconName = `${beaconDef.name} ${instanceId}`;
                             }
 
                             // Mettre à jour la position du beacon si c'est la dernière détection
@@ -1289,7 +1289,12 @@
         function initializeMap() {
             // Charger les définitions des beacons depuis GitHub
             fetch('https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erreur lors du chargement du fichier beacons.json');
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     beaconDefinitions = data; // Stocker les définitions des beacons
                     console.log('Définitions des beacons chargées:', beaconDefinitions);
