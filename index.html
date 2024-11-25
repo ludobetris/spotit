@@ -769,10 +769,10 @@
             // Trier la liste combinée par nom (ordre alphabétique)
             combinedList.sort((a, b) => a.name.localeCompare(b.name));
 
-            // Ajouter les options triées au sélecteur
+            // Ajouter les options triées au sélecteur en utilisant 'type::id' comme délimiteur
             combinedList.forEach(item => {
                 const option = document.createElement('option');
-                option.value = `${item.type}-${item.id}`;
+                option.value = `${item.type}::${item.id}`; // Utiliser '::' comme délimiteur
                 option.textContent = item.name;
                 trackerSelect.appendChild(option);
             });
@@ -787,7 +787,9 @@
             const selectedValue = event.target.value;
             if (!selectedValue) return;
 
-            const [type, id] = selectedValue.includes('-') ? selectedValue.split('-') : ['tracker', selectedValue];
+            // Utiliser '::' comme délimiteur
+            const [type, ...idParts] = selectedValue.split('::');
+            const id = idParts.join('::'); // Rejoindre au cas où l'id contient '::'
 
             if (type === 'tracker') {
                 const selectedTracker = trackers.find(tracker => tracker.deviceId == id);
@@ -1125,7 +1127,9 @@
                     return;
                 }
 
-                const [type, id] = selectedValue.includes('-') ? selectedValue.split('-') : ['tracker', selectedValue];
+                // Utiliser '::' comme délimiteur
+                const [type, ...idParts] = selectedValue.split('::');
+                const id = idParts.join('::'); // Rejoindre au cas où l'id contient '::'
 
                 if (type === 'tracker') {
                     const trackerId = id;
