@@ -855,6 +855,11 @@
                     map.setStyle('mapbox://styles/mapbox/streets-v11');
                 }
             });
+
+            // Réajouter les marqueurs de beacons après le chargement du nouveau style
+            map.on('style.load', () => {
+                Object.values(beaconMarkers).forEach(marker => marker.addTo(map));
+            });
         }
 
         // Fonction pour afficher les suggestions
@@ -1197,11 +1202,13 @@
             document.getElementById('toggle-depot').style.display = 'flex';
             document.getElementById('map-switch-container').style.display = 'flex';
 
-            // Appeler la fonction pour récupérer et afficher les données des trackers
-            getTrackersData();
+            // Appeler la fonction pour récupérer et afficher les données des trackers après le chargement de la carte
+            map.on('load', () => {
+                getTrackersData();
 
-            // Mettre en place la mise à jour périodique des positions
-            updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
+                // Mettre en place la mise à jour périodique des positions
+                updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
+            });
         }
 
         // Gestion du formulaire de connexion
