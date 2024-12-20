@@ -668,10 +668,11 @@
                             const beaconId = `${namespaceId}-${instanceId}`;
 
                             // Décaler légèrement la position du beacon pour éviter le chevauchement avec le tracker
-                            const offsetLng = 0.00006; // Approx. 6 mètres
-                            const offsetLat = 0.00006; // Approx. 6 mètres
+                            const offsetLng = 0.00006 * i; // Décalage longitudinal basé sur l'index
+                            const offsetLat = 0.00006 * i; // Décalage latitudinal basé sur l'index
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
+
 
                             // Trouver le nom et l'icône du beacon à partir des définitions (comparaison insensible à la casse)
                             let beaconName = `Beacon ${namespaceId} ${instanceId}`; // Nom par défaut
