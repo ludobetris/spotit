@@ -631,7 +631,6 @@
             }
 
             // Calcul de l'angle pour disposer les beacons en éventail
-            // index s'étale de 1 à 4, total = 4
             const angleDeg = (index - 1) * (360 / total);
             const angleRad = angleDeg * (Math.PI / 180);
 
@@ -641,6 +640,27 @@
 
             return { offsetLng, offsetLat };
         }
+
+        // ---- AJOUT : fonction pour générer l'icône batterie + couleur en fonction de la tension ----
+        function getBatteryIconHtml(voltage) {
+            if (!voltage || isNaN(voltage)) {
+                return 'N/A';
+            }
+
+            // Convertir en nombre flottant
+            const v = parseFloat(voltage);
+            let color = 'red';   // Par défaut : rouge
+            // Vous pouvez ajuster les seuils selon vos préférences
+            if (v >= 3.9) {
+                color = 'green'; 
+            } else if (v >= 3.7) {
+                color = 'gold'; // jaune
+            } 
+            
+            // Petite icône batterie + la valeur en volts
+            return `<span style="color:${color};">🔋</span> ${v.toFixed(2)}V`;
+        }
+        // -------------------------------------------------------------------------------------------
 
         // Fonction pour obtenir les données des groupes, devices, et positions de Traccar
         async function getTrackersData() {
@@ -911,6 +931,15 @@
                 if (checkedGroups.includes(groupe)) {
                     // Vérifier que les coordonnées sont valides
                     if (typeof tracker.longitude === 'number' && typeof tracker.latitude === 'number') {
+                        
+                        // ---- Récupérer la valeur de la batterie (courant) ----
+                        let batteryVoltage = null;
+                        if (tracker.attributes && tracker.attributes.courant) {
+                            batteryVoltage = tracker.attributes.courant;
+                        }
+                        const batteryIconHtml = getBatteryIconHtml(batteryVoltage);
+                        // ------------------------------------------------------
+
                         let marker;
                         // Si le groupe est "Pickups" (insensible à la casse)
                         if (groupe.toLowerCase() === 'pickups') {
@@ -925,8 +954,12 @@
                             marker = new mapboxgl.Marker(el)
                                 .setLngLat([tracker.longitude, tracker.latitude])
                                 .setPopup(
-                                    new mapboxgl.Popup({ closeButton: false }) 
-                                        .setHTML(`<strong>Nom:</strong> ${tracker.name || "Inconnu"}`)
+                                    // Offset ajouté pour décaler la popup vers le haut
+                                    new mapboxgl.Popup({ closeButton: false, offset: 25 })
+                                        .setHTML(`
+                                            <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
+                                            <strong>Batterie:</strong> ${batteryIconHtml}
+                                        `)
                                 );
                         }
                         // Si le groupe est "Chargeuse"
@@ -942,8 +975,11 @@
                             marker = new mapboxgl.Marker(el)
                                 .setLngLat([tracker.longitude, tracker.latitude])
                                 .setPopup(
-                                    new mapboxgl.Popup({ closeButton: false })
-                                        .setHTML(`<strong>Nom:</strong> ${tracker.name || "Inconnu"}`)
+                                    new mapboxgl.Popup({ closeButton: false, offset: 25 })
+                                        .setHTML(`
+                                            <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
+                                            <strong>Batterie:</strong> ${batteryIconHtml}
+                                        `)
                                 );
                         }
                         else {
@@ -951,8 +987,11 @@
                             marker = new mapboxgl.Marker()
                                 .setLngLat([tracker.longitude, tracker.latitude])
                                 .setPopup(
-                                    new mapboxgl.Popup({ closeButton: false })
-                                        .setHTML(`<strong>Nom:</strong> ${tracker.name || "Inconnu"}`)
+                                    new mapboxgl.Popup({ closeButton: false, offset: 25 })
+                                        .setHTML(`
+                                            <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
+                                            <strong>Batterie:</strong> ${batteryIconHtml}
+                                        `)
                                 );
                         }
 
@@ -991,7 +1030,7 @@
                         const marker = new mapboxgl.Marker(el)
                             .setLngLat([beacon.longitude, beacon.latitude])
                             .setPopup(
-                                new mapboxgl.Popup({ closeButton: false })
+                                new mapboxgl.Popup({ closeButton: false, offset: 25 })
                                     .setHTML(`<strong>Nom:</strong> ${beacon.name || "Beacon"}<br><strong>RSSI:</strong> ${beacon.rssi}`)
                             );
 
