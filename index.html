@@ -253,10 +253,10 @@
             flex-direction: column;
         }
         
-        /* Timeline : modifié pour remonter un peu la barre */
+        /* Timeline (remontée un peu : bottom: 60px) */
         #timeline-container {
             position: absolute;
-            bottom: 50px; /* On remonte la barre pour ne pas qu'elle soit collée au bord */
+            bottom: 60px; /* Au lieu de 0 pour la remonter un peu */
             left: 0;
             width: 100%;
             background: rgba(255, 255, 255, 0.9);
@@ -269,7 +269,9 @@
             z-index: 20;
         }
         #timeline {
-            width: 80%;
+            width: 60%;
+            margin-left: 10px;
+            margin-right: 10px;
         }
         #current-time {
             margin-left: 10px;
@@ -554,9 +556,10 @@
         <input type="checkbox" id="map-switch" title="Changer la vue de la carte">
     </div>
 
-    <!-- Timeline : ajout du champ date -->
+    <!-- Timeline (avec le champ date à gauche) -->
     <div id="timeline-container">
-        <input type="date" id="route-date" />
+        <!-- Champ de date -->
+        <input type="date" id="route-date" style="max-width: 150px;">
         <input type="range" id="timeline" min="0" max="100" value="0">
         <span id="current-time">00:00:00</span>
     </div>
@@ -629,7 +632,7 @@
         function openPopup(popup) {
             // En commentaire, ce qui fermait le popup précédent :
             // if (currentPopup) {
-            //     currentPopup.remove(); 
+            //     currentPopup.remove();
             // }
             currentPopup = popup;
             currentPopup.addTo(map);
@@ -1087,9 +1090,12 @@
             if (!map) {
                 return;
             }
+            // Au lieu de tout supprimer, on va faire un "update" des marqueurs trackers,
+            // et supprimer uniquement ceux qui ne sont plus d'actualité.
+
             const checkedGroups = Array.from(checkedGroupsSet);
 
-            // Trackers
+            // On récupère la liste des IDs trackers qu'on veut afficher
             const visibleTrackerIds = [];
             trackers.forEach(t => {
                 if (!t.hasPositions) return;
@@ -1098,6 +1104,8 @@
 
                 visibleTrackerIds.push(String(t.deviceId));
 
+                // Si le marqueur existe déjà, on met juste à jour sa position.
+                // Sinon, on le crée.
                 let marker = markers[t.deviceId];
                 if (!marker) {
                     // Création du DOM
@@ -1149,6 +1157,7 @@
                     marker.addTo(map);
                     markers[t.deviceId] = marker;
                 } else {
+                    // On met à jour la position si le marqueur existe déjà
                     marker.setLngLat([t.longitude, t.latitude]);
                 }
             });
@@ -1161,7 +1170,7 @@
                 }
             });
 
-            // Beacons
+            // Gérer les beacons de la même manière
             const visibleBeaconIds = [];
             Object.values(beacons).forEach(b => {
                 if (!checkedGroups.includes(b.group)) return;
@@ -1384,8 +1393,12 @@
             });
         }
 
-        // Modification pour utiliser la date sélectionnée
         function setupRouteButton() {
+            // Par défaut, initialiser le champ de date au jour courant
+            const routeDateInput = document.getElementById('route-date');
+            const today = new Date();
+            routeDateInput.valueAsDate = today; // valeur par défaut = aujourd'hui
+
             document.getElementById('route-button').addEventListener('click', () => {
                 const val = document.getElementById('tracker-select').value;
                 if (!val) {
@@ -1401,17 +1414,17 @@
                     type = val.substring(0, idx);
                     id = val.substring(idx+1);
                 }
-
                 if (type === 'tracker') {
-                    // On récupère la date choisie
-                    const selectedDate = document.getElementById('route-date').value;
+                    // Récupérer la date du champ
+                    const selectedDate = routeDateInput.value; // format "yyyy-mm-dd"
                     if (!selectedDate) {
-                        alert("Veuillez sélectionner une date dans le champ à gauche du curseur pour afficher la route.");
+                        alert("Date invalide.");
                         return;
                     }
-                    const sDate = new Date(selectedDate);
-                    const startOfDay = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate()).toISOString();
-                    const endOfDay = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate() + 1).toISOString();
+                    // Construire from & to sur cette date
+                    const dateObj = new Date(selectedDate);
+                    const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).toISOString();
+                    const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1).toISOString();
 
                     fetch(`https://demo2.traccar.org/api/positions?deviceId=${id}&from=${startOfDay}&to=${endOfDay}`, {
                         headers: {
