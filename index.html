@@ -9,7 +9,6 @@
     <!-- Chart.js pour tracer un graphique -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Styles existants inchangés */
         body, html {
             margin: 0;
             padding: 0;
@@ -173,7 +172,6 @@
             display: flex;
             align-items: center;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-            /* Changement pour aligner les éléments horizontalement */
         }
         .search-bar {
             position: relative;
@@ -274,7 +272,6 @@
             margin-left: 10px;
             font-weight: bold;
         }
-        /* Marqueur de la timeline */
         .timeline-marker {
             position: absolute;
             width: 12px;
@@ -345,14 +342,11 @@
             border-radius: 50%;
         }
 
-        /* Media Queries pour les écrans de 768px et moins (tablettes et mobiles) */
+        /* Media Queries pour les écrans de 768px et moins */
         @media (max-width: 768px) {
-            /* Ajuster la largeur des panneaux de contrôle */
             #controls-container, #depot-container {
-                width: 80%; /* Réduire la largeur pour s'adapter aux petits écrans */
+                width: 80%;
             }
-            
-            /* Modifier la position des panneaux pour éviter de couvrir trop d'écran */
             #controls-container {
                 top: 0;
                 left: 0;
@@ -363,20 +357,14 @@
                 right: 0;
                 transform: translateX(100%);
             }
-
-            /* Ajuster les titres des panneaux */
             #controls-container h2, #depot-container h2 {
-                margin-top: 20px; /* Réduire la marge supérieure */
+                margin-top: 20px;
                 font-size: 1em;
             }
-
-            /* Modifier la barre de recherche pour qu'elle prenne plus de place */
             #search-container {
                 flex-direction: column;
                 align-items: stretch;
             }
-
-            /* Ajuster la largeur des éléments de la barre de recherche */
             #search-input {
                 width: 100%;
                 margin-bottom: 10px;
@@ -386,34 +374,25 @@
                 margin-left: 0;
                 margin-bottom: 10px;
             }
-
-            /* Ajuster la position des boutons de basculement */
             .toggle-button {
                 width: 35px;
                 height: 35px;
                 font-size: 18px;
             }
-
-            /* Ajuster la position de la timeline */
             #timeline-container {
                 width: 100%;
             }
-
-            /* Afficher les contrôles de navigation en bas à droite pour éviter de couvrir les éléments importants */
             .mapboxgl-ctrl-top-right {
                 top: auto;
                 bottom: 20%;
             }
         }
 
-        /* Media Queries pour les écrans de 480px et moins (smartphones) */
+        /* Media Queries pour les écrans de 480px et moins */
         @media (max-width: 480px) {
-            /* Réduire davantage la largeur des panneaux de contrôle */
             #controls-container, #depot-container {
                 width: 50%;
             }
-
-            /* Modifier la position des panneaux pour éviter de couvrir trop d'écran */
             #controls-container {
                 top: 80px;
                 left: 0;
@@ -424,48 +403,34 @@
                 right: 0;
                 transform: translateX(100%);
             }
-
-            /* Réduire la taille des polices pour une meilleure lisibilité */
             #controls-container h2, #depot-container h2 {
                 font-size: 1em;
             }
-
-            /* Ajuster les paddings */
             #controls-container, #depot-container {
                 padding: 15px;
             }
-
-            /* Ajuster la taille des boutons et des éléments interactifs */
             #search-button, #route-button, .toggle-button {
                 font-size: 16px;
                 padding: 10px;
             }
-
-            /* Ajuster la taille des éléments de la timeline */
             #timeline {
                 width: 90%;
             }
-
-            /* Réduire la taille des marqueurs de la timeline */
             .timeline-marker {
                 width: 10px;
                 height: 10px;
             }
-
-            /* Ajuster la barre de recherche */
             .search-bar {
                 max-width: 100%;
             }
         }
 
-        /* Améliorations supplémentaires pour une meilleure expérience tactile */
         /* Augmenter la taille des zones cliquables */
         label, button, select {
             min-height: 40px;
             padding: 10px;
         }
 
-        /* Assurer un bon espacement entre les éléments */
         #controls-content, #depot-content, #search-container {
             margin-bottom: 10px;
         }
@@ -506,14 +471,7 @@
         #battery-modal-close:hover {
             background: #999;
         }
-        /* Zone pour le formulaire de choix de dates */
-        #battery-date-form {
-            margin-bottom: 20px;
-        }
-        #battery-date-form label {
-            display: inline-block;
-            margin-right: 10px;
-        }
+        /* On retire le formulaire de dates, on affiche 7 jours par défaut */
         #battery-chart {
             width: 100%;
             height: 300px;
@@ -542,17 +500,8 @@
     <div id="battery-modal">
         <div id="battery-modal-content">
             <button id="battery-modal-close">Fermer</button>
-            <h3>Historique de tension</h3>
-            <!-- Formulaire de choix de plage de dates -->
-            <form id="battery-date-form">
-                <label for="battery-from-date">Début:</label>
-                <input type="datetime-local" id="battery-from-date" required>
-
-                <label for="battery-to-date">Fin:</label>
-                <input type="datetime-local" id="battery-to-date" required>
-
-                <button type="submit">Charger le graphique</button>
-            </form>
+            <h3>Historique de tension (7 derniers jours)</h3>
+            <!-- On retire le formulaire de dates -->
             <canvas id="battery-chart"></canvas>
         </div>
     </div>
@@ -568,7 +517,6 @@
         <!-- Sélecteur de tracker -->
         <select id="tracker-select">
             <option value="">Sélectionnez un device</option>
-            <!-- Options seront ajoutées dynamiquement -->
         </select>
         <button id="route-button">Afficher Route</button>
     </div>
@@ -728,11 +676,12 @@
             }
         }
 
-        // Ouvrir le modal du graphique
+        // Ouvrir le modal du graphique => on déclenche le chargement automatique (7 derniers jours)
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
             modal.style.display = 'flex';
+            loadBatteryData(); // On charge directement sur 7 jours
         }
 
         // Fermer le modal du graphique
@@ -741,21 +690,15 @@
             modal.style.display = 'none';
         }
 
-        // Charger les données de tension sur la période choisie
-        function loadBatteryData(event) {
-            event.preventDefault();
-            const fromDateInput = document.getElementById('battery-from-date').value;
-            const toDateInput = document.getElementById('battery-to-date').value;
-            if (!fromDateInput || !toDateInput) {
-                alert("Veuillez choisir une plage de dates.");
-                return;
-            }
+        // Charger les données de tension sur les 7 derniers jours
+        function loadBatteryData() {
             if (!currentBatteryDeviceId) {
                 alert("Aucun deviceId sélectionné pour le graphique.");
                 return;
             }
-            const fromISO = new Date(fromDateInput).toISOString();
-            const toISO = new Date(toDateInput).toISOString();
+            const now = new Date();
+            const toISO = now.toISOString();
+            const fromISO = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 jours en arrière
 
             fetch(`https://demo2.traccar.org/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
                 method: 'GET',
@@ -772,7 +715,7 @@
             })
             .then(data => {
                 if (!data || !data.length) {
-                    alert("Aucune donnée de tension trouvée sur cette période.");
+                    alert("Aucune donnée de tension trouvée sur cette période (7 jours).");
                     return;
                 }
                 const labels = [];
@@ -793,6 +736,7 @@
                     return;
                 }
                 const ctx = document.getElementById('battery-chart').getContext('2d');
+                // Détruire le chart s'il existe déjà
                 if (batteryChart) {
                     batteryChart.destroy();
                 }
@@ -841,11 +785,6 @@
         }
 
         // --- FONCTIONS PRINCIPALES ---
-
-        // 1) Récupère la liste des devices
-        // 2) Pour chaque device, on récupère la dernière position pour l'affichage direct
-        //    ET on récupère les positions des 24 dernières heures pour la tension éventuelle.
-        //    Ainsi, on pourra afficher sur la carte la tension si trouvée.
         async function getTrackersData() {
             try {
                 // 1) Récupération liste des devices
@@ -878,20 +817,11 @@
                     groupIdToName[group.id] = group.name;
                 });
 
-                // On prépare un tableau des devices avec groupe
-                // car on aura besoin de la dernière position (pour lat/lon) + tension
                 const now = new Date();
                 const dateTo = now.toISOString();
                 const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString(); // 24h en arrière
-
-                // On va stocker la dernière position globale + la tension trouvée sur la période
                 const finalDevices = [];
 
-                // Pour éviter de multiplier trop les requêtes, on va :
-                //  - Récupérer la liste des devices
-                //  - Pour chacun, on appelle /api/positions (24h)
-                //    On prend la "dernière" (par deviceTime) comme position courante
-                //    On calcule si "power" existe => on stocke la moyenne sur les 3 dernières occurrences
                 for (const dev of devicesData) {
                     const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
                     const positionsUrl = `https://demo2.traccar.org/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
@@ -905,11 +835,10 @@
                     });
                     if (!positionsResp.ok) {
                         console.warn(`Erreur positions pour device ${dev.id}: ${positionsResp.statusText}`);
-                        continue; // on saute
+                        continue;
                     }
                     const positionsData = await positionsResp.json();
                     if (!positionsData || positionsData.length === 0) {
-                        // Aucune data sur 24h
                         finalDevices.push({
                             deviceId: dev.id,
                             name: dev.name || `Tracker ${dev.id}`,
@@ -921,17 +850,12 @@
                         });
                         continue;
                     }
-                    // trier par date
                     positionsData.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
-
-                    // On prend la dernière comme position courante
                     const lastPos = positionsData[positionsData.length - 1];
                     const lat = parseFloat(lastPos.latitude);
                     const lon = parseFloat(lastPos.longitude);
 
-                    // On calcule la moyenne sur 3 dernières occurrences du champ power
                     let powers = [];
-                    // On va prendre les positionsData "du fond" pour ne garder que 3 occurrences
                     for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
                         let pVal = positionsData[i].attributes?.power;
                         if (pVal !== undefined) {
@@ -960,12 +884,9 @@
                     });
                 }
 
-                // On met trackers dans une variable globale
                 trackers = finalDevices;
 
-                // 3) On récupère les beacons via la position "la plus fraîche" (comme avant)
-                //    (Dans ce cas, on va juste demander la position "courante" via /api/positions
-                //     car c’est plus léger, et on reconstruit les beacons.)
+                // 3) Beacons
                 const currentPositionsResp = await fetch('https://demo2.traccar.org/api/positions', {
                     method: 'GET',
                     headers: {
@@ -975,7 +896,6 @@
                 });
                 const currentPositionsData = await currentPositionsResp.json();
 
-                // Reconstruire beacons
                 beacons = {};
                 currentPositionsData.forEach(position => {
                     for (let i = 1; i <= 4; i++) {
@@ -1037,7 +957,6 @@
             const groupList = document.getElementById('group-list');
             groupList.innerHTML = '';
 
-            // Récupérer tous les groupes
             const uniqueGroups = [
                 ...new Set([
                     ...trackers.map(t => t.group),
@@ -1122,7 +1041,6 @@
                     }
                 }
             } else {
-                // beacon
                 const bSel = beacons[id];
                 if (bSel && bSel.latitude && bSel.longitude) {
                     map.flyTo({ center: [bSel.longitude, bSel.latitude] });
@@ -1148,16 +1066,17 @@
 
             // Affichage trackers
             trackers.forEach(t => {
-                if (!t.hasPositions) return; // pas de position => pas d'affichage
+                if (!t.hasPositions) return;
                 if (!checkedGroups.includes(t.group)) return;
                 if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
 
                 let el;
+                // Remettre la taille des pickups comme avant (50x50), et garder la chargeuse à 70x70
                 if (t.group.toLowerCase() === 'pickups') {
                     el = document.createElement('img');
                     el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                    el.style.width = '70px';
-                    el.style.height = '70px';
+                    el.style.width = '50px';
+                    el.style.height = '50px';
                 } else if (t.group.toLowerCase() === 'chargeuse') {
                     el = document.createElement('img');
                     el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
@@ -1346,7 +1265,7 @@
                 });
         }
 
-        // Barre de recherche
+        let searchMarker = null;
         function setupSearch() {
             document.getElementById('search-button').addEventListener('click', () => {
                 const q = searchInput.value.trim();
@@ -1395,7 +1314,6 @@
             });
         }
 
-        // Click sur la carte => enlever route + timeline
         function setupMapClickListener() {
             map.on('click', () => {
                 removeRoute();
@@ -1407,7 +1325,6 @@
             });
         }
 
-        // Bouton route
         function setupRouteButton() {
             document.getElementById('route-button').addEventListener('click', () => {
                 const val = document.getElementById('tracker-select').value;
@@ -1425,7 +1342,6 @@
                     id = val.substring(idx+1);
                 }
                 if (type === 'tracker') {
-                    // route du jour
                     const now = new Date();
                     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
                     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
@@ -1602,9 +1518,7 @@
 
                     // Gérer la fermeture du modal batterie
                     document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
-                    // Gérer le submit du formulaire de date pour afficher le graph
-                    document.getElementById('battery-date-form').addEventListener('submit', loadBatteryData);
-
+                    
                     // Rendre visibles
                     document.getElementById('search-container').style.display = 'flex';
                     document.getElementById('toggle-controls').style.display = 'flex';
@@ -1616,6 +1530,17 @@
                     alert("Erreur lors du chargement des beacons.");
                 });
         }
+
+        function stopUpdatingPositions() {
+            if (updateIntervalId) {
+                clearInterval(updateIntervalId);
+                updateIntervalId = null;
+            }
+        }
+
+        window.addEventListener('beforeunload', () => {
+            stopUpdatingPositions();
+        });
 
         // Gestion du formulaire de connexion
         document.getElementById('credentials-form').addEventListener('submit', (event) => {
@@ -1633,17 +1558,6 @@
 
             document.getElementById('credentials-modal').style.display = 'none';
             initializeMap();
-        });
-
-        function stopUpdatingPositions() {
-            if (updateIntervalId) {
-                clearInterval(updateIntervalId);
-                updateIntervalId = null;
-            }
-        }
-
-        window.addEventListener('beforeunload', () => {
-            stopUpdatingPositions();
         });
     </script>
 </body>
