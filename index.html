@@ -641,21 +641,22 @@
             return { offsetLng, offsetLat };
         }
 
-        // ---- AJOUT : fonction pour générer l'icône batterie + couleur en fonction de la tension ----
+        // ---- Fonction pour générer l'icône batterie + couleur en fonction de la tension ----
+        //    (utilisé pour l'External Voltage en volts)
         function getBatteryIconHtml(voltage) {
             if (!voltage || isNaN(voltage)) {
                 return 'N/A';
             }
-
             // Convertir en nombre flottant
             const v = parseFloat(voltage);
-            let color = 'red';   // Par défaut : rouge
-            // Vous pouvez ajuster les seuils selon vos préférences
-            if (v >= 3.9) {
+            let color = 'red'; // Par défaut : rouge
+            // Seuils de couleur (vous pouvez les ajuster selon vos préférences)
+            if (v >= 13.0) {
+                // Ex. si votre circuit est en 12 V nominal, vous pouvez ajuster ce seuil
                 color = 'green'; 
-            } else if (v >= 3.7) {
+            } else if (v >= 12.0) {
                 color = 'gold'; // jaune
-            } 
+            }
             
             // Petite icône batterie + la valeur en volts
             return `<span style="color:${color};">🔋</span> ${v.toFixed(2)}V`;
@@ -932,13 +933,20 @@
                     // Vérifier que les coordonnées sont valides
                     if (typeof tracker.longitude === 'number' && typeof tracker.latitude === 'number') {
                         
-                        // ---- Récupérer la valeur de la batterie (courant) ----
-                        let batteryVoltage = null;
-                        if (tracker.attributes && tracker.attributes.courant) {
-                            batteryVoltage = tracker.attributes.courant;
+                        // ---- Récupérer la valeur de l'external voltage (ID 66) depuis les attributs ----
+                        //     Dans Traccar, cela se trouve souvent dans `tracker.attributes.io66`.
+                        //     On suppose que `io66` = valeur brute en millivolts.
+                        //     Appliquez le multiplicateur 0.001 pour obtenir les volts.
+                        let rawVoltage = null;
+                        if (tracker.attributes && tracker.attributes.io66) {
+                            rawVoltage = parseFloat(tracker.attributes.io66); // en mV
                         }
-                        const batteryIconHtml = getBatteryIconHtml(batteryVoltage);
-                        // ------------------------------------------------------
+                        let batteryIconHtml = 'N/A';
+                        if (rawVoltage) {
+                            const voltageV = rawVoltage * 0.001; // conversion en volts
+                            batteryIconHtml = getBatteryIconHtml(voltageV);
+                        }
+                        // --------------------------------------------------------------------------------
 
                         let marker;
                         // Si le groupe est "Pickups" (insensible à la casse)
@@ -958,7 +966,7 @@
                                     new mapboxgl.Popup({ closeButton: false, offset: 25 })
                                         .setHTML(`
                                             <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
-                                            <strong>Batterie:</strong> ${batteryIconHtml}
+                                            <strong>Voltage:</strong> ${batteryIconHtml}
                                         `)
                                 );
                         }
@@ -978,7 +986,7 @@
                                     new mapboxgl.Popup({ closeButton: false, offset: 25 })
                                         .setHTML(`
                                             <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
-                                            <strong>Batterie:</strong> ${batteryIconHtml}
+                                            <strong>Voltage:</strong> ${batteryIconHtml}
                                         `)
                                 );
                         }
@@ -990,7 +998,7 @@
                                     new mapboxgl.Popup({ closeButton: false, offset: 25 })
                                         .setHTML(`
                                             <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
-                                            <strong>Batterie:</strong> ${batteryIconHtml}
+                                            <strong>Voltage:</strong> ${batteryIconHtml}
                                         `)
                                 );
                         }
