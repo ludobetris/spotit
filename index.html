@@ -695,6 +695,12 @@
             loadingText.innerText = 'Chargement...';
             batteryModalContent.appendChild(loadingText);
 
+            // On détruit le chart existant s'il y en a un, pour ne pas l'afficher pendant le chargement
+            if (batteryChart) {
+                batteryChart.destroy();
+                batteryChart = null;
+            }
+
             modal.style.display = 'flex';
             loadBatteryData(); // On charge directement sur 7 jours
         }
@@ -755,7 +761,7 @@
                     return;
                 }
                 const ctx = document.getElementById('battery-chart').getContext('2d');
-                // Détruire le chart s'il existe déjà
+                // Détruire le chart s'il existe déjà (par sécurité supplémentaire)
                 if (batteryChart) {
                     batteryChart.destroy();
                 }
