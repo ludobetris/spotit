@@ -253,10 +253,10 @@
             flex-direction: column;
         }
         
-        /* Timeline */
+        /* Timeline : modifié pour remonter un peu la barre */
         #timeline-container {
             position: absolute;
-            bottom: 0;
+            bottom: 50px; /* On remonte la barre pour ne pas qu'elle soit collée au bord */
             left: 0;
             width: 100%;
             background: rgba(255, 255, 255, 0.9);
@@ -554,8 +554,9 @@
         <input type="checkbox" id="map-switch" title="Changer la vue de la carte">
     </div>
 
-    <!-- Timeline -->
+    <!-- Timeline : ajout du champ date -->
     <div id="timeline-container">
+        <input type="date" id="route-date" />
         <input type="range" id="timeline" min="0" max="100" value="0">
         <span id="current-time">00:00:00</span>
     </div>
@@ -1086,12 +1087,9 @@
             if (!map) {
                 return;
             }
-            // Au lieu de tout supprimer, on va faire un "update" des marqueurs trackers,
-            // et supprimer uniquement ceux qui ne sont plus d'actualité.
-
             const checkedGroups = Array.from(checkedGroupsSet);
 
-            // On récupère la liste des IDs trackers qu'on veut afficher
+            // Trackers
             const visibleTrackerIds = [];
             trackers.forEach(t => {
                 if (!t.hasPositions) return;
@@ -1100,8 +1098,6 @@
 
                 visibleTrackerIds.push(String(t.deviceId));
 
-                // Si le marqueur existe déjà, on met juste à jour sa position.
-                // Sinon, on le crée.
                 let marker = markers[t.deviceId];
                 if (!marker) {
                     // Création du DOM
@@ -1153,7 +1149,6 @@
                     marker.addTo(map);
                     markers[t.deviceId] = marker;
                 } else {
-                    // On met à jour la position si le marqueur existe déjà
                     marker.setLngLat([t.longitude, t.latitude]);
                 }
             });
@@ -1166,7 +1161,7 @@
                 }
             });
 
-            // Gérer les beacons de la même manière
+            // Beacons
             const visibleBeaconIds = [];
             Object.values(beacons).forEach(b => {
                 if (!checkedGroups.includes(b.group)) return;
@@ -1389,6 +1384,7 @@
             });
         }
 
+        // Modification pour utiliser la date sélectionnée
         function setupRouteButton() {
             document.getElementById('route-button').addEventListener('click', () => {
                 const val = document.getElementById('tracker-select').value;
@@ -1405,10 +1401,18 @@
                     type = val.substring(0, idx);
                     id = val.substring(idx+1);
                 }
+
                 if (type === 'tracker') {
-                    const now = new Date();
-                    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-                    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+                    // On récupère la date choisie
+                    const selectedDate = document.getElementById('route-date').value;
+                    if (!selectedDate) {
+                        alert("Veuillez sélectionner une date dans le champ à gauche du curseur pour afficher la route.");
+                        return;
+                    }
+                    const sDate = new Date(selectedDate);
+                    const startOfDay = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate()).toISOString();
+                    const endOfDay = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate() + 1).toISOString();
+
                     fetch(`https://demo2.traccar.org/api/positions?deviceId=${id}&from=${startOfDay}&to=${endOfDay}`, {
                         headers: {
                             'Authorization': 'Basic ' + TRACCAR_AUTH,
@@ -1421,7 +1425,7 @@
                     })
                     .then(data => {
                         if (!data.length) {
-                            alert("Aucune donnée de route pour aujourd'hui.");
+                            alert("Aucune donnée de route pour la date sélectionnée.");
                             return;
                         }
                         data.sort((a, b) => new Date(a.time) - new Date(b.time));
