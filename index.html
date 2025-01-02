@@ -1095,7 +1095,7 @@
                     const iconUrl = getBatteryIcon(t.avgVoltage);
                     const explanation = getBatteryTooltip(t.avgVoltage);
                     popupHTML += `<br/><strong>Batterie:</strong>
-                            <img src="${iconUrl}" alt="Battery" style="width:20px; vertical-align:middle; margin-right:5px;" />
+                            <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
                             <a href="#" onclick="showVoltageChart(${t.deviceId}); return false;"
                                title="${explanation}"
                                style="color:blue; text-decoration:underline;">
