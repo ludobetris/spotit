@@ -6,8 +6,11 @@
     <title>Carte Mapbox avec Trackers Traccar</title>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <!-- Chart.js pour tracer un graphique -->
+    <!-- Chart.js pour tracer un graphique + adaptateur temps -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
+
     <style>
         body, html {
             margin: 0;
@@ -471,7 +474,6 @@
         #battery-modal-close:hover {
             background: #999;
         }
-        /* On retire le formulaire de dates, on affiche 7 jours par défaut */
         #battery-chart {
             width: 100%;
             height: 300px;
@@ -501,7 +503,6 @@
         <div id="battery-modal-content">
             <button id="battery-modal-close">Fermer</button>
             <h3>Historique de tension (7 derniers jours)</h3>
-            <!-- On retire le formulaire de dates -->
             <canvas id="battery-chart"></canvas>
         </div>
     </div>
@@ -1033,7 +1034,7 @@
 
             if (type === 'tracker') {
                 const selected = trackers.find(t => String(t.deviceId) === String(id));
-                if (selected && selected.latitude && selected.longitude) {
+                if (selected && typeof selected.latitude === 'number' && typeof selected.longitude === 'number') {
                     map.flyTo({ center: [selected.longitude, selected.latitude] });
                     const marker = markers[selected.deviceId];
                     if (marker) {
@@ -1042,7 +1043,7 @@
                 }
             } else {
                 const bSel = beacons[id];
-                if (bSel && bSel.latitude && bSel.longitude) {
+                if (bSel && typeof bSel.latitude === 'number' && typeof bSel.longitude === 'number') {
                     map.flyTo({ center: [bSel.longitude, bSel.latitude] });
                     const marker = beaconMarkers[bSel.id];
                     if (marker) {
@@ -1071,12 +1072,12 @@
                 if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
 
                 let el;
-                // Remettre la taille des pickups comme avant (50x50), et garder la chargeuse à 70x70
+                // Corriger la taille des pickups : même taille que la chargeuse (70x70) mais sans déformation
                 if (t.group.toLowerCase() === 'pickups') {
                     el = document.createElement('img');
                     el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                    el.style.width = '50px';
-                    el.style.height = '50px';
+                    el.style.width = '70px';
+                    el.style.height = '70px';
                 } else if (t.group.toLowerCase() === 'chargeuse') {
                     el = document.createElement('img');
                     el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
