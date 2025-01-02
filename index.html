@@ -6,6 +6,8 @@
     <title>Carte Mapbox avec Trackers Traccar</title>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <!-- Ajout de Chart.js pour le graphique de tensions -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* Styles existants inchangés */
         body, html {
@@ -504,6 +506,18 @@
         #battery-modal-close:hover {
             background: #999;
         }
+        /* Zone pour le formulaire de choix de dates */
+        #battery-date-form {
+            margin-bottom: 20px;
+        }
+        #battery-date-form label {
+            display: inline-block;
+            margin-right: 10px;
+        }
+        #battery-chart {
+            width: 100%;
+            height: 300px;
+        }
     </style>
 </head>
 <body>
@@ -529,12 +543,17 @@
         <div id="battery-modal-content">
             <button id="battery-modal-close">Fermer</button>
             <h3>Historique de tension</h3>
-            <!-- Ici, on pourrait intégrer un vrai graphique avec un outil comme Chart.js ou autre.
-                 Pour l'instant, on affiche simplement du texte, ou un futur composant de graphique. -->
-            <div id="battery-chart-placeholder">
-                <p>Graphique de la tension (placeholder).<br/>
-                Vous pourrez choisir vos plages de date ici.</p>
-            </div>
+            <!-- Formulaire de choix de plage de dates -->
+            <form id="battery-date-form">
+                <label for="battery-from-date">Début:</label>
+                <input type="datetime-local" id="battery-from-date" required>
+
+                <label for="battery-to-date">Fin:</label>
+                <input type="datetime-local" id="battery-to-date" required>
+
+                <button type="submit">Charger le graphique</button>
+            </form>
+            <canvas id="battery-chart"></canvas>
         </div>
     </div>
 
@@ -641,6 +660,12 @@
         // Historique de puissance/batterie (pour calculer la moyenne des 3 dernières valeurs)
         let devicePowerHistory = {};
 
+        // Pour retenir le deviceID sélectionné pour le graphique
+        let currentBatteryDeviceId = null;
+
+        // Chart.js
+        let batteryChart = null;
+
         // --- FONCTIONS UTILITAIRES ---
 
         // Fonction de calcul de distance (Haversine)
@@ -699,14 +724,7 @@
 
         // Fonction pour récupérer l'icône de batterie selon la tension moyenne
         function getBatteryIcon(voltage) {
-            // Vous pouvez remplacer par de vraies icônes si vous le souhaitez.
-            // Pour simplifier, on utilise 5 paliers:
-            // <10.5 => battery-lv0
-            // <12 => battery-lv1
-            // <12.35 => battery-lv2
-            // <12.60 => battery-lv3
-            // >=12.60 => battery-lv4
-
+            // Paliers d'icônes
             if (voltage < 10.5) {
                 return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
             } else if (voltage < 12.0) {
@@ -722,16 +740,14 @@
 
         // Fonction pour récupérer un texte explicatif selon la tension
         function getBatteryTooltip(voltage) {
-            // On se base sur la description fournie dans la demande
-            // (on donne juste un "cas le plus proche" en fonction de la tension moyenne)
             if (voltage < 10.5) {
-                return "Tension <10.5V : Batterie HS (soudure inter-élément coupée ou décharge profonde).";
+                return "Tension <10.5V : Batterie HS (soudure coupée ou décharge profonde).";
             } else if (voltage < 12.0) {
                 return "Tension ~12.0V : Batterie endommagée, décharge profonde. À recharger + test d'effort.";
             } else if (voltage < 12.35) {
-                return "Tension ~12.2V : Entre 12.0 et 12.35 => Batterie à ~25-50%, risque d'endommagement si ça reste bas.";
+                return "Tension ~12.2V : Entre 12.0 et 12.35 => 25-50% de charge, attention à l'endommagement.";
             } else if (voltage < 12.6) {
-                return "Tension ~12.35-12.59V : Batterie entre 50% et 99%. En dessous de 12.35V, on l'endommage à long terme.";
+                return "Tension ~12.35-12.59V : Batterie entre 50% et 99%. En dessous de 12.35V, elle s'endommage à long terme.";
             } else {
                 return "Tension >= 12.60V : 100% Batterie chargée.";
             }
@@ -739,19 +755,124 @@
 
         // Fonction pour ouvrir le modal du graphique
         function showVoltageChart(deviceId) {
-            // Ici, vous pouvez charger des données supplémentaires via API, etc.
-            // Pour l'instant, on se contente d'afficher un modal "placeholder".
+            currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
             modal.style.display = 'flex';
-
-            // S'il fallait récupérer un historique plus complet, c'est ici qu'on le ferait.
-            // Par exemple : fetch /api/positions?deviceId=xxx&from=xxx&to=xxx => affichage sur un graphe Chart.js
         }
 
         // Fonction pour fermer le modal du graphique
         function closeVoltageChart() {
             const modal = document.getElementById('battery-modal');
             modal.style.display = 'none';
+        }
+
+        // Fonction pour charger les données de tension via l'API Traccar et les afficher dans le graphique
+        function loadBatteryData(event) {
+            event.preventDefault();
+
+            // Récupérer les dates du formulaire
+            const fromDateInput = document.getElementById('battery-from-date').value;
+            const toDateInput = document.getElementById('battery-to-date').value;
+
+            if (!fromDateInput || !toDateInput) {
+                alert("Veuillez choisir une plage de dates.");
+                return;
+            }
+
+            if (!currentBatteryDeviceId) {
+                alert("Aucun deviceId sélectionné pour le graphique.");
+                return;
+            }
+
+            const fromISO = new Date(fromDateInput).toISOString();
+            const toISO = new Date(toDateInput).toISOString();
+
+            // Requête pour récupérer les positions entre ces dates
+            fetch(`https://demo2.traccar.org/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + TRACCAR_AUTH,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data || !data.length) {
+                    alert("Aucune donnée de tension trouvée sur cette période.");
+                    return;
+                }
+
+                // Préparer les données pour le graphique : tension (power) en fonction du temps
+                const labels = [];
+                const powers = [];
+
+                // On trie par deviceTime
+                data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
+
+                data.forEach(pos => {
+                    const powerVal = pos.attributes?.power;
+                    if (typeof powerVal === 'number') {
+                        labels.push(pos.deviceTime);
+                        powers.push(powerVal);
+                    }
+                });
+
+                // Si aucun point à tracer
+                if (powers.length === 0) {
+                    alert("Aucune donnée de tension disponible (champ 'power') sur cette période.");
+                    return;
+                }
+
+                // Créer ou mettre à jour le graphique
+                const ctx = document.getElementById('battery-chart').getContext('2d');
+
+                if (batteryChart) {
+                    batteryChart.destroy();
+                }
+
+                batteryChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Voltage (V)',
+                            data: powers,
+                            borderColor: 'blue',
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    parser: true,
+                                    tooltipFormat: 'YYYY-MM-DD HH:mm:ss',
+                                    displayFormats: {
+                                        hour: 'YYYY-MM-DD HH:mm'
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Heure'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Voltage (V)'
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erreur lors de la récupération des données de tension.");
+            });
         }
 
         // --- FIN FONCTIONS UTILITAIRES ---
@@ -817,7 +938,7 @@
                 positionsData.forEach(pos => {
                     const devId = pos.deviceId;
                     const power = pos.attributes?.power;
-                    if (typeof power !== 'undefined') {
+                    if (typeof power === 'number') {
                         if (!devicePowerHistory[devId]) {
                             devicePowerHistory[devId] = [];
                         }
@@ -1087,7 +1208,7 @@
                             const iconUrl = getBatteryIcon(avgVoltage);
                             const explanation = getBatteryTooltip(avgVoltage);
 
-                            // On fait un petit lien cliquable sur la tension pour afficher le graphique
+                            // Lien cliquable sur la tension pour afficher le graphique
                             popupHTML += `<br/><strong>Batterie:</strong> 
                                 <img src="${iconUrl}" alt="Battery" style="width:20px; vertical-align:middle; margin-right:5px;" />
                                 <a href="#" onclick="showVoltageChart(${tracker.deviceId}); return false;" 
@@ -1364,7 +1485,7 @@
             });
         }
 
-        // Ajouter un écouteur pour supprimer éventuellement la route ou la timeline quand on clique sur la carte
+        // Ajouter un écouteur pour éventuellement supprimer la route ou la timeline quand on clique sur la carte
         function setupMapClickListener() {
             map.on('click', () => {
                 // Supprimer le trajet si il existe
@@ -1643,6 +1764,8 @@
 
                     // Gérer la fermeture du modal batterie
                     document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
+                    // Gérer le submit du formulaire de date
+                    document.getElementById('battery-date-form').addEventListener('submit', loadBatteryData);
 
                     // Afficher les éléments de l'interface
                     document.getElementById('search-container').style.display = 'flex';
