@@ -1393,12 +1393,87 @@
             });
         }
 
+        // -------------------
+        // NOUVELLE FONCTION : générer un gradient coloré pour la timeline
+        // Rouge si le tracker a bougé (> 5m) entre i et i+1, sinon gris.
+        // -------------------
+        function createTimelineGradient(data) {
+            if (!data || data.length < 2) {
+                return '#ccc'; // tout gris si pas de données
+            }
+            let segments = [];
+            const total = data.length - 1; // nombre d'intervalles
+            for (let i = 0; i < total; i++) {
+                const lat1 = data[i].coordinates[1];
+                const lon1 = data[i].coordinates[0];
+                const lat2 = data[i+1].coordinates[1];
+                const lon2 = data[i+1].coordinates[0];
+                const dist = getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2);
+                
+                // Seuil "bougé" = 5m
+                const color = dist > 5 ? 'red' : 'gray';
+                
+                const startPercent = (i / total) * 100;
+                const endPercent = ((i+1) / total) * 100;
+                segments.push(`${color} ${startPercent}% ${endPercent}%`);
+            }
+            return `linear-gradient(to right, ${segments.join(', ')})`;
+        }
+
+        // Récupération + affichage route selon la date
+        function fetchAndDisplayRoute(trackerId, dateStr) {
+            if (!trackerId || !dateStr) return;
+
+            removeRoute();
+            hideTimeline();
+
+            const dateObj = new Date(dateStr);
+            if (isNaN(dateObj.getTime())) {
+                alert("Date invalide.");
+                return;
+            }
+
+            // Construire from & to sur cette date
+            const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).toISOString();
+            const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1).toISOString();
+
+            fetch(`https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
+                headers: {
+                    'Authorization': 'Basic ' + TRACCAR_AUTH,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(r => {
+                if (!r.ok) throw new Error("Erreur route: " + r.statusText);
+                return r.json();
+            })
+            .then(data => {
+                if (!data.length) {
+                    alert("Aucune donnée de route pour la date sélectionnée.");
+                    return;
+                }
+                data.sort((a, b) => new Date(a.time) - new Date(b.time));
+                const coords = data.map(p => [parseFloat(p.longitude), parseFloat(p.latitude)]);
+                timelineData = data.map(p => ({
+                    time: new Date(p.deviceTime),
+                    coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)]
+                }));
+                addRouteToMap(coords);
+                initializeTimeline();
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erreur lors de la récupération de la route.");
+            });
+        }
+
         function setupRouteButton() {
             // Par défaut, initialiser le champ de date au jour courant
             const routeDateInput = document.getElementById('route-date');
             const today = new Date();
             routeDateInput.valueAsDate = today; // valeur par défaut = aujourd'hui
 
+            // Quand on clique sur "Afficher Route"
             document.getElementById('route-button').addEventListener('click', () => {
                 const val = document.getElementById('tracker-select').value;
                 if (!val) {
@@ -1406,56 +1481,26 @@
                     return;
                 }
                 const idx = val.indexOf('-');
-                let type, id;
-                if (idx === -1) {
-                    type = 'tracker';
-                    id = val;
-                } else {
-                    type = val.substring(0, idx);
-                    id = val.substring(idx+1);
-                }
+                let type = val.substring(0, idx);
+                let id = val.substring(idx+1);
                 if (type === 'tracker') {
-                    // Récupérer la date du champ
-                    const selectedDate = routeDateInput.value; // format "yyyy-mm-dd"
-                    if (!selectedDate) {
-                        alert("Date invalide.");
-                        return;
-                    }
-                    // Construire from & to sur cette date
-                    const dateObj = new Date(selectedDate);
-                    const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).toISOString();
-                    const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1).toISOString();
-
-                    fetch(`https://demo2.traccar.org/api/positions?deviceId=${id}&from=${startOfDay}&to=${endOfDay}`, {
-                        headers: {
-                            'Authorization': 'Basic ' + TRACCAR_AUTH,
-                            'Content-Type': 'application/json'
-                        }
-                    })
-                    .then(r => {
-                        if (!r.ok) throw new Error("Erreur route: " + r.statusText);
-                        return r.json();
-                    })
-                    .then(data => {
-                        if (!data.length) {
-                            alert("Aucune donnée de route pour la date sélectionnée.");
-                            return;
-                        }
-                        data.sort((a, b) => new Date(a.time) - new Date(b.time));
-                        const coords = data.map(p => [parseFloat(p.longitude), parseFloat(p.latitude)]);
-                        timelineData = data.map(p => ({
-                            time: new Date(p.deviceTime),
-                            coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)]
-                        }));
-                        addRouteToMap(coords);
-                        initializeTimeline();
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        alert("Erreur lors de la récupération de la route.");
-                    });
+                    const selectedDate = routeDateInput.value; // "yyyy-mm-dd"
+                    fetchAndDisplayRoute(id, selectedDate);
                 } else {
                     alert("La fonctionnalité de route n'est pas dispo pour les beacons.");
+                }
+            });
+
+            // Quand on change la date manuellement, on recharge automatiquement la route
+            routeDateInput.addEventListener('change', () => {
+                const val = document.getElementById('tracker-select').value;
+                if (!val) return; // pas de tracker sélectionné => on ne fait rien
+                const idx = val.indexOf('-');
+                let type = val.substring(0, idx);
+                let id = val.substring(idx+1);
+                if (type === 'tracker') {
+                    const selectedDate = routeDateInput.value; 
+                    fetchAndDisplayRoute(id, selectedDate);
                 }
             });
         }
@@ -1508,6 +1553,9 @@
             timeline.value = 0;
             currentTimeDisplay.textContent = formatTime(timelineData[0].time);
 
+            // Colorer le slider
+            timeline.style.background = createTimelineGradient(timelineData);
+
             if (timelineMarker) {
                 timelineMarker.remove();
                 timelineMarker = null;
@@ -1538,6 +1586,8 @@
             const timeline = document.getElementById('timeline');
             timeline.value = 0;
             document.getElementById('current-time').textContent = '00:00:00';
+            // Remettre le background par défaut
+            timeline.style.background = '#ccc';
         }
 
         function formatTime(date) {
