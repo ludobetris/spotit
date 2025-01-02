@@ -580,7 +580,7 @@
         let beacons = {};
         let beaconMarkers = {};
 
-        // Variable pour n'afficher qu'une popup à la fois
+        // Variable pour n'afficher qu'une popup à la fois (si besoin)
         let currentPopup = null;
 
         // Définir une variable pour stocker les définitions des beacons
@@ -624,10 +624,12 @@
             return R * c;
         }
 
+        // On modifie openPopup pour ne plus fermer l'ancien popup
         function openPopup(popup) {
-            if (currentPopup) {
-                currentPopup.remove(); 
-            }
+            // En commentaire, ce qui fermait le popup précédent :
+            // if (currentPopup) {
+            //     currentPopup.remove(); 
+            // }
             currentPopup = popup;
             currentPopup.addTo(map);
         }
@@ -681,6 +683,18 @@
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
+
+            // On affiche un texte de chargement pendant la récupération des données
+            const batteryModalContent = document.getElementById('battery-modal-content');
+            // Pour éviter de cumuler plusieurs paragraphes "Chargement...", on le retire si déjà présent
+            const oldLoading = document.getElementById('battery-loading-text');
+            if (oldLoading) oldLoading.remove();
+
+            let loadingText = document.createElement('p');
+            loadingText.id = 'battery-loading-text';
+            loadingText.innerText = 'Chargement...';
+            batteryModalContent.appendChild(loadingText);
+
             modal.style.display = 'flex';
             loadBatteryData(); // On charge directement sur 7 jours
         }
@@ -715,6 +729,10 @@
                 return response.json();
             })
             .then(data => {
+                // On retire le message de chargement
+                const loadTxt = document.getElementById('battery-loading-text');
+                if (loadTxt) loadTxt.remove();
+
                 if (!data || !data.length) {
                     alert("Aucune donnée de tension trouvée sur cette période (7 jours).");
                     return;
@@ -780,6 +798,10 @@
                 });
             })
             .catch(err => {
+                // On retire le message de chargement même si erreur
+                const loadTxt = document.getElementById('battery-loading-text');
+                if (loadTxt) loadTxt.remove();
+
                 console.error(err);
                 alert("Erreur lors de la récupération des données de tension: " + err.message);
             });
@@ -1058,98 +1080,133 @@
             if (!map) {
                 return;
             }
-            Object.values(markers).forEach(m => m.remove());
-            markers = {};
-            Object.values(beaconMarkers).forEach(m => m.remove());
-            beaconMarkers = {};
+            // Au lieu de tout supprimer, on va faire un "update" des marqueurs trackers,
+            // et supprimer uniquement ceux qui ne sont plus d'actualité.
 
             const checkedGroups = Array.from(checkedGroupsSet);
 
-            // Affichage trackers
+            // On récupère la liste des IDs trackers qu'on veut afficher
+            const visibleTrackerIds = [];
             trackers.forEach(t => {
                 if (!t.hasPositions) return;
                 if (!checkedGroups.includes(t.group)) return;
                 if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
 
-                let el;
-                if (t.group.toLowerCase() === 'pickups') {
-                    el = document.createElement('img');
-                    el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                    el.style.width = '80px';
-                    el.style.height = '35px';
-                } else if (t.group.toLowerCase() === 'chargeuse') {
-                    el = document.createElement('img');
-                    el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
-                    el.style.width = '90px';
-                    el.style.height = '90px';
-                } else {
-                    el = document.createElement('div');
-                    el.style.width = '20px';
-                    el.style.height = '20px';
-                    el.style.borderRadius = '50%';
-                    el.style.backgroundColor = 'orange';
-                }
+                visibleTrackerIds.push(String(t.deviceId));
 
-                let popupHTML = `<strong>Nom:</strong> ${t.name}`;
-                if (t.avgVoltage !== null) {
-                    const iconUrl = getBatteryIcon(t.avgVoltage);
-                    const explanation = getBatteryTooltip(t.avgVoltage);
-                    popupHTML += `<br/><strong>Batterie:</strong>
+                // Si le marqueur existe déjà, on met juste à jour sa position.
+                // Sinon, on le crée.
+                let marker = markers[t.deviceId];
+                if (!marker) {
+                    // Création du DOM
+                    let el;
+                    if (t.group.toLowerCase() === 'pickups') {
+                        el = document.createElement('img');
+                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
+                        el.style.width = '80px';
+                        el.style.height = '35px';
+                    } else if (t.group.toLowerCase() === 'chargeuse') {
+                        el = document.createElement('img');
+                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
+                        el.style.width = '90px';
+                        el.style.height = '90px';
+                    } else {
+                        el = document.createElement('div');
+                        el.style.width = '20px';
+                        el.style.height = '20px';
+                        el.style.borderRadius = '50%';
+                        el.style.backgroundColor = 'orange';
+                    }
+
+                    // Popup
+                    let popupHTML = `<strong>Nom:</strong> ${t.name}`;
+                    if (t.avgVoltage !== null) {
+                        const iconUrl = getBatteryIcon(t.avgVoltage);
+                        const explanation = getBatteryTooltip(t.avgVoltage);
+                        popupHTML += `<br/><strong>Batterie:</strong>
                             <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
                             <a href="#" onclick="showVoltageChart(${t.deviceId}); return false;"
                                title="${explanation}"
                                style="color:blue; text-decoration:underline;">
                                 ${t.avgVoltage} V
                             </a>`;
+                    }
+
+                    const popup = new mapboxgl.Popup({
+                        closeButton: false,
+                        offset: 25
+                    }).setHTML(popupHTML);
+
+                    marker = new mapboxgl.Marker(el)
+                        .setLngLat([t.longitude, t.latitude])
+                        .setPopup(popup);
+
+                    marker.getElement().addEventListener('click', () => {
+                        openPopup(marker.getPopup());
+                    });
+                    marker.addTo(map);
+                    markers[t.deviceId] = marker;
+                } else {
+                    // On met à jour la position si le marqueur existe déjà
+                    marker.setLngLat([t.longitude, t.latitude]);
                 }
-
-                const popup = new mapboxgl.Popup({
-                    closeButton: false,
-                    offset: 25
-                }).setHTML(popupHTML);
-
-                const marker = new mapboxgl.Marker(el)
-                    .setLngLat([t.longitude, t.latitude])
-                    .setPopup(popup);
-
-                marker.getElement().addEventListener('click', () => {
-                    openPopup(marker.getPopup());
-                });
-                marker.addTo(map);
-                markers[t.deviceId] = marker;
             });
 
-            // Affichage beacons
+            // On retire de la carte les marqueurs trackers qui ne sont plus visibles
+            Object.keys(markers).forEach(deviceId => {
+                if (!visibleTrackerIds.includes(deviceId)) {
+                    markers[deviceId].remove();
+                    delete markers[deviceId];
+                }
+            });
+
+            // Gérer les beacons de la même manière
+            const visibleBeaconIds = [];
             Object.values(beacons).forEach(b => {
                 if (!checkedGroups.includes(b.group)) return;
                 if (typeof b.longitude !== 'number' || typeof b.latitude !== 'number') return;
 
-                let el;
-                if (b.iconUrl) {
-                    el = document.createElement('img');
-                    el.src = b.iconUrl;
-                    el.style.width = '50px';
-                    el.style.height = '50px';
+                visibleBeaconIds.push(b.id);
+
+                let marker = beaconMarkers[b.id];
+                if (!marker) {
+                    let el;
+                    if (b.iconUrl) {
+                        el = document.createElement('img');
+                        el.src = b.iconUrl;
+                        el.style.width = '50px';
+                        el.style.height = '50px';
+                    } else {
+                        el = document.createElement('div');
+                        el.className = 'beacon-marker';
+                    }
+
+                    const popup = new mapboxgl.Popup({
+                        closeButton: false,
+                        offset: 25
+                    }).setHTML(`<strong>Nom:</strong> ${b.name}<br><strong>RSSI:</strong> ${b.rssi}`);
+
+                    marker = new mapboxgl.Marker(el)
+                        .setLngLat([b.longitude, b.latitude])
+                        .setPopup(popup);
+
+                    marker.getElement().addEventListener('click', () => {
+                        openPopup(marker.getPopup());
+                    });
+
+                    marker.addTo(map);
+                    beaconMarkers[b.id] = marker;
                 } else {
-                    el = document.createElement('div');
-                    el.className = 'beacon-marker';
+                    marker.setLngLat([b.longitude, b.latitude]);
                 }
+            });
 
-                const popup = new mapboxgl.Popup({
-                    closeButton: false,
-                    offset: 25
-                }).setHTML(`<strong>Nom:</strong> ${b.name}<br><strong>RSSI:</strong> ${b.rssi}`);
-
-                const marker = new mapboxgl.Marker(el)
-                    .setLngLat([b.longitude, b.latitude])
-                    .setPopup(popup);
-
-                marker.getElement().addEventListener('click', () => {
-                    openPopup(marker.getPopup());
-                });
-
-                marker.addTo(map);
-                beaconMarkers[b.id] = marker;
+            // On retire de la carte les marqueurs beacons qui ne sont plus visibles
+            Object.keys(beaconMarkers).forEach(bId => {
+                if (!visibleBeaconIds.includes(bId)) {
+                    beaconMarkers[bId].remove();
+                    delete beaconMarkers[bId];
+                }
             });
         }
 
@@ -1224,6 +1281,7 @@
                 }
             });
             map.on('style.load', () => {
+                // Ré-ajout de tous les marqueurs existants
                 Object.values(beaconMarkers).forEach(m => m.addTo(map));
                 Object.values(markers).forEach(m => m.addTo(map));
             });
