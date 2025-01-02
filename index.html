@@ -4,8 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Carte Mapbox avec Trackers Traccar</title>
+    
+    <!-- Mapbox CSS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+    <!-- Chart.js (pour l'affichage du graphique) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Mapbox JS -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    
     <style>
         body, html {
             margin: 0;
@@ -14,19 +20,18 @@
             height: 100%;
             overflow: hidden;
             font-family: Arial, sans-serif;
-            position: fixed; /* Assure que le contenu reste fixe et évite le glissement */
+            position: fixed;
         }
         #map {
             width: 100%;
             height: 100%;
         }
-        /* Panneaux de contrôle */
+        
+        /* Extraits de styles existants */
         #controls-container, #depot-container {
             position: absolute;
-            top: 0;
-            bottom: 0;
+            top: 0; bottom: 0;
             width: 250px;
-            height: 100%;
             display: flex;
             flex-direction: column;
             background: rgba(240, 240, 240, 0.95);
@@ -35,15 +40,13 @@
             box-sizing: border-box;
             transition: transform 0.3s ease;
             z-index: 21;
-            overflow-y: auto; /* Ajouté pour permettre le défilement si contenu trop long */
+            overflow-y: auto;
         }
         #controls-container {
-            left: 0;
-            transform: translateX(-100%);
+            left: 0; transform: translateX(-100%);
         }
         #depot-container {
-            right: 0;
-            transform: translateX(100%);
+            right: 0; transform: translateX(100%);
         }
         #controls-container.active {
             transform: translateX(0);
@@ -51,42 +54,15 @@
         #depot-container.active {
             transform: translateX(0);
         }
-        /* Titres des panneaux */
         #controls-container h2, #depot-container h2 {
-            margin-top: 70px; /* Réduit la marge supérieure pour un meilleur alignement */
+            margin-top: 70px;
             margin-bottom: 10px;
             font-size: 1.2em;
-            flex-shrink: 0;
         }
-        /* Contenu des panneaux */
-        #controls-content, #depot-content {
-            flex-grow: 1;
-        }
-        /* Group checkboxes empilés verticalement */
-        .group-checkbox {
-            margin-bottom: 10px;
-            overflow-y: auto;
-        }
-        .group-checkbox label {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-            cursor: pointer;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            background: #fff;
-        }
-        .group-checkbox input[type="checkbox"] {
-            margin-right: 10px;
-            cursor: pointer;
-        }
-        /* Boutons de basculement */
         .toggle-button {
             position: absolute;
             top: 20px;
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             background: #ffffff;
             border: 1px solid #ccc;
             border-radius: 5px;
@@ -97,71 +73,14 @@
             justify-content: center;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
             font-size: 20px;
-            -webkit-user-select: none;
-            user-select: none;
         }
-        #toggle-controls {
-            left: 20px;
-        }
-        #toggle-depot {
-            right: 20px;
-        }
+        #toggle-controls { left: 20px; }
+        #toggle-depot { right: 20px; }
 
-        /* Liste "Dépôt" */
-        #depot-content ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        #depot-content li {
-            margin-bottom: 10px;
-            padding: 5px;
-            border-bottom: 1px solid #ccc;
-        }
-        #depot-content li:last-child {
-            border-bottom: none;
-        }
-        #depot-content button {
-            background: none;
-            border: none;
-            padding: 0;
-            font: inherit;
-            color: #007bff;
-            cursor: pointer;
-            text-align: left;
-            width: 100%;
-        }
-        #depot-content button:hover {
-            text-decoration: underline;
-        }
-        /* Switch pour changer la vue de la carte */
-        #map-switch-container {
-            position: absolute;
-            bottom: 20px;
-            left: 20px; /* Positionné discrètement au bas gauche */
-            background: rgba(255, 255, 255, 0.8);
-            padding: 5px;
-            border-radius: 5px;
-            z-index: 20;
-            display: flex;
-            align-items: center;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-        }
-        #map-switch {
-            margin-left: 5px;
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-        }
-        /* Style pour descendre les contrôles de navigation en haut à droite */
-        .mapboxgl-ctrl-top-right {
-            top: 25%;
-        }
-        /* Barre de recherche d'adresse et sélection de tracker */
+        /* Barre de recherche */
         #search-container {
             position: absolute;
-            top: 10px;
-            left: 50%;
+            top: 10px; left: 50%;
             transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.9);
             padding: 5px 10px;
@@ -196,68 +115,51 @@
         #search-button:hover {
             background: #0056b3;
         }
-        /* Liste des suggestions */
         #suggestions-list {
             list-style: none;
             padding: 0;
-            margin-top: 5px; /* Marge au-dessus de la liste pour éviter de la coller au champ */
+            margin-top: 5px;
             background: #fff;
             border: 1px solid #ccc;
             display: none;
             position: absolute;
-            top: 100%; /* Positionne la liste juste en dessous du champ de recherche */
-            left: 0; /* Aligne la liste avec le côté gauche du champ de recherche */
-            width: 100%; /* Assure que la liste a la même largeur que le champ */
+            top: 100%;
+            left: 0;
+            width: 100%;
             max-height: 150px;
             overflow-y: auto;
             z-index: 30;
         }
         #suggestions-list li {
-            padding: 5px;
-            cursor: pointer;
+            padding: 5px; cursor: pointer;
         }
         #suggestions-list li:hover {
             background-color: #f0f0f0;
         }
-        /* Sélecteur de tracker */
         #tracker-select {
             margin-left: 10px;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            font-size: 16px;
-            width: 100%;
+            padding: 5px; border: 1px solid #ccc;
+            border-radius: 3px; font-size: 16px; width: 100%;
         }
-        /* Bouton pour afficher la route */
         #route-button {
-            margin-left: 10px;
-            padding: 5px 10px;
-            border: none;
-            background: #28a745;
-            color: #fff;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 16px;
+            margin-left: 10px; padding: 5px 10px;
+            border: none; background: #28a745;
+            color: #fff; border-radius: 3px;
+            cursor: pointer; font-size: 16px;
         }
         #route-button:hover {
             background: #1e7e34;
         }
-        /* Amélioration de l'apparence des listes */
-        #group-list, #depot-list {
-            display: flex;
-            flex-direction: column;
-        }
-        
+
         /* Timeline */
         #timeline-container {
             position: absolute;
-            bottom: 0;
-            left: 0;
+            bottom: 0; left: 0;
             width: 100%;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
             box-sizing: border-box;
-            display: none; /* Caché par défaut */
+            display: none;
             align-items: center;
             justify-content: center;
             box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
@@ -267,31 +169,16 @@
             width: 80%;
         }
         #current-time {
-            margin-left: 10px;
-            font-weight: bold;
-        }
-        /* Marqueur de la timeline */
-        .timeline-marker {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: yellow;
-            border: 2px solid red;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
+            margin-left: 10px; font-weight: bold;
         }
 
-        /* Modal Styles */
+        /* Modal pour saisir les identifiants */
         #credentials-modal {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
+            display: flex; align-items: center;
             justify-content: center;
             z-index: 100;
         }
@@ -303,154 +190,57 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         #credentials-form h2 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            text-align: center;
+            margin-top: 0; margin-bottom: 15px; text-align: center;
         }
         #credentials-form label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+            display: block; margin-bottom: 5px; font-weight: bold;
         }
         #credentials-form input {
-            width: 94%;
-            padding: 8px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
+            width: 94%; padding: 8px;
+            margin-bottom: 15px; border: 1px solid #ccc; border-radius: 3px;
         }
         #credentials-form button {
-            width: 100%;
-            padding: 10px;
-            background: #007bff;
-            border: none;
-            color: #fff;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 16px;
+            width: 100%; padding: 10px;
+            background: #007bff; border: none; color: #fff;
+            border-radius: 3px; cursor: pointer; font-size: 16px;
         }
         #credentials-form button:hover {
             background: #0056b3;
         }
 
-        /* Style pour les marqueurs de beacons */
-        .beacon-marker {
-            background-color: blue;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
+        /* Modal pour le graphique batterie */
+        #battery-graph-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none; /* caché par défaut */
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
         }
-
-        /* Media Queries pour les écrans de 768px et moins (tablettes et mobiles) */
-        @media (max-width: 768px) {
-            #controls-container, #depot-container {
-                width: 80%;
-            }
-            
-            #controls-container {
-                top: 0;
-                left: 0;
-                transform: translateX(-100%);
-            }
-            #depot-container {
-                top: 0;
-                right: 0;
-                transform: translateX(100%);
-            }
-
-            #controls-container h2, #depot-container h2 {
-                margin-top: 20px;
-                font-size: 1em;
-            }
-
-            #search-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            #search-input {
-                width: 100%;
-                margin-bottom: 10px;
-            }
-            #tracker-select, #route-button {
-                width: 100%;
-                margin-left: 0;
-                margin-bottom: 10px;
-            }
-
-            .toggle-button {
-                width: 35px;
-                height: 35px;
-                font-size: 18px;
-            }
-
-            #timeline-container {
-                width: 100%;
-            }
-
-            .timeline-marker {
-                width: 10px;
-                height: 10px;
-            }
-
-            .mapboxgl-ctrl-top-right {
-                top: auto;
-                bottom: 20%;
-            }
+        #battery-graph-container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80%;
+            display: flex;
+            flex-direction: column;
         }
-
-        /* Media Queries pour les écrans de 480px et moins (smartphones) */
-        @media (max-width: 480px) {
-            #controls-container, #depot-container {
-                width: 50%;
-            }
-
-            #controls-container {
-                top: 80px;
-                left: 0;
-                transform: translateX(-100%);
-            }
-            #depot-container {
-                top: 80px;
-                right: 0;
-                transform: translateX(100%);
-            }
-
-            #controls-container h2, #depot-container h2 {
-                font-size: 1em;
-            }
-
-            #controls-container, #depot-container {
-                padding: 15px;
-            }
-
-            #search-button, #route-button, .toggle-button {
-                font-size: 16px;
-                padding: 10px;
-            }
-
-            #timeline {
-                width: 90%;
-            }
-
-            .timeline-marker {
-                width: 10px;
-                height: 10px;
-            }
-
-            .search-bar {
-                max-width: 100%;
-            }
+        #battery-graph-canvas {
+            width: 100%;
+            height: 400px;
         }
-
-        /* Améliorations supplémentaires pour une meilleure expérience tactile */
-        label, button, select {
-            min-height: 40px;
-            padding: 10px;
-        }
-
-        #controls-content, #depot-content, #search-container {
+        #close-graph-btn {
+            align-self: flex-end;
             margin-bottom: 10px;
+            cursor: pointer;
+            border: none;
+            background: #ccc;
+            padding: 5px 10px;
+            border-radius: 3px;
         }
     </style>
 </head>
@@ -470,6 +260,14 @@
             
             <button type="submit">Se Connecter</button>
         </form>
+    </div>
+
+    <!-- Modal pour le graphique batterie -->
+    <div id="battery-graph-modal">
+        <div id="battery-graph-container">
+            <button id="close-graph-btn">Fermer</button>
+            <canvas id="battery-graph-canvas"></canvas>
+        </div>
     </div>
 
     <!-- Barre de recherche d'adresse et sélection de tracker -->
@@ -535,20 +333,130 @@
         let beaconMarkers = {};
         let currentPopup = null;
         let beaconDefinitions = [];
+        
+        // Coordonnées de référence pour le "Dépôt"
         const depotCoordinates = [7.475422, 46.257917];
+
+        // Recherche & route
         let searchMarker = null;
         let routeLayerId = 'tracker-route';
         let routeCoordinates = [];
         let timelineData = [];
         let timelineMarker = null;
-        const searchInput = document.getElementById('search-input');
-        const suggestionsList = document.getElementById('suggestions-list');
+
+        // Intervalles
         const UPDATE_INTERVAL = 10000;
         let updateIntervalId = null;
+
+        // Ensemble pour conserver les groupes cochés
         let checkedGroupsSet = new Set();
 
+        // Sélecteurs et éléments du DOM
+        const searchInput = document.getElementById('search-input');
+        const suggestionsList = document.getElementById('suggestions-list');
+
+        // Modal pour Graphique de la batterie
+        const batteryGraphModal = document.getElementById('battery-graph-modal');
+        const closeGraphBtn = document.getElementById('close-graph-btn');
+        const batteryGraphCanvas = document.getElementById('battery-graph-canvas');
+        let batteryChart = null;
+
+        // Fermer la modal de graphique
+        closeGraphBtn.addEventListener('click', () => {
+            batteryGraphModal.style.display = 'none';
+        });
+
+        /**
+         * Fonction pour ouvrir le graphique de la batterie d'un device
+         */
+        function openBatteryGraph(deviceId) {
+            // On récupère l'historique des positions de la journée
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+
+            fetch(`https://demo2.traccar.org/api/positions?deviceId=${deviceId}&from=${startOfDay}&to=${endOfDay}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + TRACCAR_AUTH,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erreur lors de la récupération des données de la batterie.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data || !data.length) {
+                    alert('Aucune donnée de tension disponible pour ce device aujourd\'hui.');
+                    return;
+                }
+                // Trier par date (deviceTime)
+                data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
+                
+                // Extraire les timestamps et les valeurs de tension
+                const labels = [];
+                const tensionValues = [];
+                data.forEach(pos => {
+                    const t = pos.attributes && pos.attributes.power ? parseFloat(pos.attributes.power) : null;
+                    if (t !== null) {
+                        // On récupère juste l'heure/min/sec pour le label
+                        const timeLabel = new Date(pos.deviceTime).toLocaleTimeString(); 
+                        labels.push(timeLabel);
+                        tensionValues.push(t);
+                    }
+                });
+
+                if (!tensionValues.length) {
+                    alert("Aucune tension ('power') trouvée dans cette plage pour ce device.");
+                    return;
+                }
+
+                // Afficher la modal
+                batteryGraphModal.style.display = 'flex';
+
+                // Détruire l'ancien graphique si besoin
+                if (batteryChart) {
+                    batteryChart.destroy();
+                }
+
+                // Construire le nouveau graphique
+                batteryChart = new Chart(batteryGraphCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Tension Batterie (V)',
+                            data: tensionValues,
+                            borderColor: 'blue',
+                            backgroundColor: 'rgba(0, 0, 255, 0.2)',
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => {
+                console.error(error);
+                alert('Erreur lors de la récupération ou l\'affichage du graphique de tension.');
+            });
+        }
+
+        /**
+         * Calcul de distance (mètres)
+         */
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
+            const R = 6371e3; // Terre en m
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = 
@@ -556,10 +464,12 @@
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const d = R * c;
-            return d;
+            return R * c;
         }
 
+        /**
+         * Ouvrir une popup en fermant l'ancienne
+         */
         function openPopup(popup) {
             if (currentPopup) {
                 currentPopup.remove();
@@ -568,6 +478,9 @@
             currentPopup.addTo(map);
         }
 
+        /**
+         * Calcul d'un offset pour positionner un beacon autour du tracker
+         */
         function getBeaconOffset(rssi, index, total) {
             const baseDistance = 0.00002; 
             let distance;
@@ -583,8 +496,13 @@
             return { offsetLng, offsetLat };
         }
 
+        /**
+         * Récupérer les données (groupes, devices, positions)
+         * et isoler la dernière position par device.
+         */
         async function getTrackersData() {
             try {
+                // 1) Récupérer les groupes
                 const groupsResponse = await fetch('https://demo2.traccar.org/api/groups', {
                     method: 'GET',
                     headers: {
@@ -593,12 +511,12 @@
                     }
                 });
                 const groupsData = await groupsResponse.json();
-                console.log('Groupes reçus:', groupsData);
                 groups = groupsData;
                 groups.forEach(group => {
                     groupIdToName[group.id] = group.name;
                 });
 
+                // 2) Récupérer les devices
                 const devicesResponse = await fetch('https://demo2.traccar.org/api/devices', {
                     method: 'GET',
                     headers: {
@@ -607,7 +525,6 @@
                     }
                 });
                 const devicesData = await devicesResponse.json();
-                console.log('Devices reçus:', devicesData);
                 const deviceIdToInfo = {};
                 devicesData.forEach(device => {
                     deviceIdToInfo[device.id] = {
@@ -616,6 +533,7 @@
                     };
                 });
 
+                // 3) Récupérer toutes les positions "dernières" (si l'API en renvoie plusieurs, on filtrera)
                 const positionsResponse = await fetch('https://demo2.traccar.org/api/positions', {
                     method: 'GET',
                     headers: {
@@ -623,95 +541,112 @@
                         'Content-Type': 'application/json'
                     }
                 });
-                const positionsData = await positionsResponse.json();
-                console.log('Positions reçues:', positionsData);
+                const allPositionsData = await positionsResponse.json();
 
-                trackers = positionsData.map(position => ({
-                    ...position,
-                    name: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].name) || `Tracker ${position.deviceId}`,
-                    group: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].group) || 'Autre',
-                    latitude: parseFloat(position.latitude),
-                    longitude: parseFloat(position.longitude),
-                    time: position.time
-                }));
+                // Grouper par deviceId et ne garder que la position avec le deviceTime le plus récent
+                const positionsByDevice = {};
+                allPositionsData.forEach(pos => {
+                    const dId = pos.deviceId;
+                    if (!positionsByDevice[dId]) {
+                        positionsByDevice[dId] = pos;
+                    } else {
+                        // comparer deviceTime
+                        if (new Date(pos.deviceTime) > new Date(positionsByDevice[dId].deviceTime)) {
+                            positionsByDevice[dId] = pos;
+                        }
+                    }
+                });
 
-                positionsData.forEach(position => {
+                // On récupère la liste de ces dernières positions
+                const latestPositions = Object.values(positionsByDevice);
+
+                // 4) Construire le tableau `trackers`
+                trackers = latestPositions.map(position => {
+                    const devInfo = deviceIdToInfo[position.deviceId] || {};
+                    return {
+                        ...position,
+                        name: devInfo.name,
+                        group: devInfo.group,
+                        latitude: parseFloat(position.latitude),
+                        longitude: parseFloat(position.longitude),
+                        time: position.time
+                    };
+                });
+
+                // 5) Gérer les beacons (chaque position peut en contenir)
+                beacons = {}; // on ré-initialise le cache des beacons
+                latestPositions.forEach(position => {
                     for (let i = 1; i <= 4; i++) {
                         const namespaceKey = `beacon${i}Namespace`;
                         const instanceKey = `beacon${i}Instance`;
                         const rssiKey = `beacon${i}Rssi`;
-
+                        
                         if (position.attributes && position.attributes[namespaceKey] && position.attributes[instanceKey]) {
                             const namespaceId = position.attributes[namespaceKey];
                             const instanceId = position.attributes[instanceKey];
                             const beaconId = `${namespaceId}-${instanceId}`;
-
-                            const rssi = position.attributes[rssiKey];
+                            const rssi = position.attributes[rssiKey] || -60; // rssi par défaut
+                            
+                            // offset + lat/lng
                             const { offsetLng, offsetLat } = getBeaconOffset(rssi, i, 4);
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
+                            // Chercher si on a un beaconDefinition (nom + icône)
                             let beaconName = `Beacon ${namespaceId} ${instanceId}`;
                             let beaconIconUrl = null;
-                            const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
+                            const beaconDef = beaconDefinitions.find(b => 
+                                b.namespaceId.toLowerCase() === namespaceId.toLowerCase()
+                            );
                             if (beaconDef) {
                                 beaconName = beaconDef.name;
                                 beaconIconUrl = beaconDef.iconUrl || null;
                             }
 
-                            if (
-                                !beacons[beaconId] ||
-                                new Date(position.deviceTime) > new Date(beacons[beaconId].lastSeen)
-                            ) {
-                                beacons[beaconId] = {
-                                    id: beaconId,
-                                    name: beaconName,
-                                    latitude: beaconLat,
-                                    longitude: beaconLng,
-                                    lastSeen: position.deviceTime,
-                                    rssi: rssi,
-                                    group: 'Beacons',
-                                    iconUrl: beaconIconUrl
-                                };
-                            }
+                            beacons[beaconId] = {
+                                id: beaconId,
+                                name: beaconName,
+                                latitude: beaconLat,
+                                longitude: beaconLng,
+                                lastSeen: position.deviceTime,
+                                rssi: rssi,
+                                group: 'Beacons',
+                                iconUrl: beaconIconUrl
+                            };
                         }
                     }
                 });
-
-                console.log('Beacons détectés:', beacons);
 
                 displayGroupCheckboxes();
                 populateTrackerSelect();
                 updateMap();
                 populateDepotList();
+
             } catch (error) {
                 console.error('Erreur lors de la récupération des données:', error);
                 alert('Une erreur est survenue lors de la récupération des données des trackers.');
             }
         }
 
+        /**
+         * Afficher les cases à cocher des groupes
+         */
         function displayGroupCheckboxes() {
             const groupList = document.getElementById('group-list');
             groupList.innerHTML = '';
 
             const uniqueGroups = [
                 ...new Set([
-                    ...trackers.map(tracker => tracker.group),
-                    ...Object.values(beacons).map(beacon => beacon.group)
+                    ...trackers.map(t => t.group),
+                    ...Object.values(beacons).map(b => b.group)
                 ])
             ].sort();
 
             uniqueGroups.forEach(groupe => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.classList.add('group-checkbox');
                 checkbox.dataset.groupe = groupe;
-
-                if (checkedGroupsSet.has(groupe)) {
-                    checkbox.checked = true;
-                } else {
-                    checkbox.checked = false;
-                }
+                checkbox.checked = checkedGroupsSet.has(groupe);
 
                 checkbox.addEventListener('change', (event) => {
                     if (event.target.checked) {
@@ -725,11 +660,13 @@
                 const label = document.createElement('label');
                 label.textContent = groupe;
                 label.prepend(checkbox);
-
                 groupList.appendChild(label);
             });
         }
 
+        /**
+         * Peupler le sélecteur de trackers/beacons
+         */
         function populateTrackerSelect() {
             const trackerSelect = document.getElementById('tracker-select');
             trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
@@ -747,6 +684,7 @@
                 }))
             ];
 
+            // Tri alphabétique
             combinedList.sort((a, b) => a.name.localeCompare(b.name));
 
             combinedList.forEach(item => {
@@ -760,27 +698,25 @@
             trackerSelect.addEventListener('change', trackerSelectChangeHandler);
         }
 
+        /**
+         * Gestion de changement du sélecteur
+         */
         function trackerSelectChangeHandler(event) {
             const selectedValue = event.target.value;
             if (!selectedValue) return;
-
             const firstDashIndex = selectedValue.indexOf('-');
-            let type, id;
-            if (firstDashIndex === -1) {
-                type = 'tracker';
-                id = selectedValue;
-            } else {
+            
+            let type = 'tracker';
+            let id = selectedValue;
+            if (firstDashIndex !== -1) {
                 type = selectedValue.substring(0, firstDashIndex);
                 id = selectedValue.substring(firstDashIndex + 1);
             }
 
             if (type === 'tracker') {
-                const selectedTracker = trackers.find(tracker => tracker.deviceId == id);
-
+                const selectedTracker = trackers.find(t => t.deviceId == id);
                 if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
                     map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude] });
-                    console.log(`Centrage de la carte sur le tracker ${selectedTracker.name || selectedTracker.deviceId}`);
-
                     const marker = markers[selectedTracker.deviceId];
                     if (marker) {
                         openPopup(marker.getPopup());
@@ -788,167 +724,142 @@
                 }
             } else if (type === 'beacon') {
                 const selectedBeacon = beacons[id];
-
                 if (selectedBeacon && selectedBeacon.latitude && selectedBeacon.longitude) {
                     map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude] });
-                    console.log(`Centrage de la carte sur le beacon ${selectedBeacon.name}`);
-
                     const marker = beaconMarkers[selectedBeacon.id];
                     if (marker) {
                         openPopup(marker.getPopup());
                     }
-                } else {
-                    console.warn(`Le beacon sélectionné (${id}) n'a pas de coordonnées valides.`);
                 }
             }
         }
 
+        /**
+         * Mettre à jour la carte selon les groupes cochés
+         */
         function updateMap() {
-            if (!map) {
-                console.warn('La carte n\'est pas encore initialisée.');
-                return;
-            }
+            if (!map) return;
 
-            Object.values(markers).forEach(marker => marker.remove());
+            // Retirer anciens marqueurs
+            Object.values(markers).forEach(m => m.remove());
             markers = {};
-
-            Object.values(beaconMarkers).forEach(marker => marker.remove());
+            Object.values(beaconMarkers).forEach(m => m.remove());
             beaconMarkers = {};
 
             const checkedGroups = Array.from(checkedGroupsSet);
-            console.log('Groupes cochés:', checkedGroups);
 
+            // Trackers
             trackers.forEach(tracker => {
-                const groupe = tracker.group;
-                if (checkedGroups.includes(groupe)) {
-                    if (typeof tracker.longitude === 'number' && typeof tracker.latitude === 'number') {
-                        
-                        // -- Récupération de la tension batterie (variable 'power') --
-                        const batteryVoltage = tracker.attributes && tracker.attributes.power 
-                            ? parseFloat(tracker.attributes.power)
-                            : 0;
-                        // Déterminer la couleur de l'icône en fonction de la tension
-                        let batteryIconColor;
-                        if (batteryVoltage < 11) {
-                            batteryIconColor = 'red';
-                        } else if (batteryVoltage < 12) {
-                            batteryIconColor = 'orange';
-                        } else {
-                            batteryIconColor = 'green';
-                        }
-                        // Créer un petit icône de batterie
-                        const batteryIconHTML = `<span style="color: ${batteryIconColor}; font-size: 1.2em;">🔋</span>`;
-                        
-                        let marker;
-                        
-                        // Groupe "Pickups"
-                        if (groupe.toLowerCase() === 'pickups') {
-                            const el = document.createElement('img');
-                            el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                            el.style.width = '70px';
-                            el.style.height = '70px';
-                            el.style.objectFit = 'contain';
-                            el.style.margin = '0';
-                            el.style.padding = '0';
-
-                            marker = new mapboxgl.Marker(el)
-                                .setLngLat([tracker.longitude, tracker.latitude])
-                                .setPopup(
-                                    new mapboxgl.Popup({ closeButton: false, offset: [0, -25] })
-                                        .setHTML(`
-                                            <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
-                                            <strong>Batterie:</strong> ${batteryIconHTML} ${batteryVoltage.toFixed(2)} V
-                                        `)
-                                );
-                        }
-                        // Groupe "Chargeuse"
-                        else if (groupe.toLowerCase() === 'chargeuse') {
-                            const el = document.createElement('img');
-                            el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
-                            el.style.width = '70px';
-                            el.style.height = '70px';
-                            el.style.objectFit = 'contain';
-                            el.style.margin = '0';
-                            el.style.padding = '0';
-
-                            marker = new mapboxgl.Marker(el)
-                                .setLngLat([tracker.longitude, tracker.latitude])
-                                .setPopup(
-                                    new mapboxgl.Popup({ closeButton: false, offset: [0, -25] })
-                                        .setHTML(`
-                                            <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
-                                            <strong>Batterie:</strong> ${batteryIconHTML} ${batteryVoltage.toFixed(2)} V
-                                        `)
-                                );
-                        }
-                        // Groupe par défaut
-                        else {
-                            marker = new mapboxgl.Marker()
-                                .setLngLat([tracker.longitude, tracker.latitude])
-                                .setPopup(
-                                    new mapboxgl.Popup({ closeButton: false, offset: [0, -25] })
-                                        .setHTML(`
-                                            <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
-                                            <strong>Batterie:</strong> ${batteryIconHTML} ${batteryVoltage.toFixed(2)} V
-                                        `)
-                                );
-                        }
-
-                        marker.getElement().addEventListener('click', () => {
-                            openPopup(marker.getPopup());
-                        });
-
-                        marker.addTo(map);
-                        markers[tracker.deviceId] = marker;
-
-                        console.log(`Ajout du tracker ${tracker.name || tracker.deviceId} au groupe ${groupe}`);
-                    } else {
-                        console.warn(`Tracker ${tracker.name || tracker.deviceId} a des coordonnées invalides.`);
-                    }
+                if (!checkedGroups.includes(tracker.group)) return;
+                if (typeof tracker.longitude !== 'number' || typeof tracker.latitude !== 'number') return;
+                
+                const batteryVoltage = tracker.attributes && tracker.attributes.power 
+                    ? parseFloat(tracker.attributes.power)
+                    : 0;
+                
+                // Couleur de l'icône "batterie" selon tension
+                let batteryIconColor;
+                if (batteryVoltage < 11) {
+                    batteryIconColor = 'red';
+                } else if (batteryVoltage < 12) {
+                    batteryIconColor = 'orange';
+                } else {
+                    batteryIconColor = 'green';
                 }
+                const batteryIconHTML = `<span style="color: ${batteryIconColor}; font-size: 1.2em;">🔋</span>`;
+
+                // Choisir l'icône selon le groupe
+                let markerElement;
+                let imgSrc = '';
+                if (tracker.group.toLowerCase() === 'pickups') {
+                    imgSrc = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
+                } else if (tracker.group.toLowerCase() === 'chargeuse') {
+                    imgSrc = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
+                }
+
+                if (imgSrc) {
+                    const el = document.createElement('img');
+                    el.src = imgSrc;
+                    el.style.width = '70px';
+                    el.style.height = '70px';
+                    el.style.objectFit = 'contain';
+                    markerElement = el;
+                } else {
+                    markerElement = document.createElement('div');
+                    markerElement.style.background = '#1E90FF';
+                    markerElement.style.width = '20px';
+                    markerElement.style.height = '20px';
+                    markerElement.style.borderRadius = '50%';
+                }
+
+                // Construire le marker
+                const marker = new mapboxgl.Marker(markerElement)
+                    .setLngLat([tracker.longitude, tracker.latitude])
+                    .setPopup(
+                        new mapboxgl.Popup({ closeButton: false, offset: [0, -25] })
+                            .setHTML(`
+                                <strong>Nom:</strong> ${tracker.name || "Inconnu"}<br>
+                                <strong>Batterie:</strong> ${batteryIconHTML} ${batteryVoltage.toFixed(2)} V
+                                <br><br>
+                                <!-- Bouton pour voir le graphique -->
+                                <button 
+                                    style="padding:4px 8px;cursor:pointer;font-size:0.9em;"
+                                    onclick="openBatteryGraph(${tracker.deviceId})"
+                                >
+                                    Voir le graphique
+                                </button>
+                            `)
+                    );
+                
+                marker.getElement().addEventListener('click', () => {
+                    openPopup(marker.getPopup());
+                });
+                marker.addTo(map);
+                markers[tracker.deviceId] = marker;
             });
 
+            // Beacons
             Object.values(beacons).forEach(beacon => {
-                const groupe = beacon.group;
-                if (checkedGroups.includes(groupe)) {
-                    if (typeof beacon.longitude === 'number' && typeof beacon.latitude === 'number') {
-                        let el;
-                        if (beacon.iconUrl) {
-                            el = document.createElement('img');
-                            el.src = beacon.iconUrl;
-                            el.style.width = '50px';
-                            el.style.height = '50px';
-                            el.style.objectFit = 'contain';
-                        } else {
-                            el = document.createElement('div');
-                            el.className = 'beacon-marker';
-                        }
+                if (!checkedGroups.includes(beacon.group)) return;
+                if (typeof beacon.longitude !== 'number' || typeof beacon.latitude !== 'number') return;
 
-                        const marker = new mapboxgl.Marker(el)
-                            .setLngLat([beacon.longitude, beacon.latitude])
-                            .setPopup(
-                                new mapboxgl.Popup({ closeButton: false, offset: [0, -25] })
-                                    .setHTML(`
-                                        <strong>Nom:</strong> ${beacon.name || "Beacon"}<br>
-                                        <strong>RSSI:</strong> ${beacon.rssi}
-                                    `)
-                            );
-
-                        marker.getElement().addEventListener('click', () => {
-                            openPopup(marker.getPopup());
-                        });
-
-                        marker.addTo(map);
-                        beaconMarkers[beacon.id] = marker;
-
-                        console.log(`Ajout du beacon ${beacon.name} au groupe ${groupe}`);
-                    } else {
-                        console.warn(`Beacon ${beacon.name} a des coordonnées invalides.`);
-                    }
+                let el;
+                if (beacon.iconUrl) {
+                    el = document.createElement('img');
+                    el.src = beacon.iconUrl;
+                    el.style.width = '50px';
+                    el.style.height = '50px';
+                    el.style.objectFit = 'contain';
+                } else {
+                    el = document.createElement('div');
+                    el.className = 'beacon-marker';
+                    el.style.background = 'blue';
+                    el.style.width = '20px';
+                    el.style.height = '20px';
+                    el.style.borderRadius = '50%';
                 }
+
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat([beacon.longitude, beacon.latitude])
+                    .setPopup(
+                        new mapboxgl.Popup({ closeButton: false, offset: [0, -25] })
+                            .setHTML(`
+                                <strong>Nom:</strong> ${beacon.name || "Beacon"}<br>
+                                <strong>RSSI:</strong> ${beacon.rssi}
+                            `)
+                    );
+
+                marker.getElement().addEventListener('click', () => {
+                    openPopup(marker.getPopup());
+                });
+                marker.addTo(map);
+                beaconMarkers[beacon.id] = marker;
             });
         }
 
+        /**
+         * Populate la liste "Dépôt" (rayon 200m)
+         */
         function populateDepotList() {
             const depotList = document.getElementById('depot-list');
             depotList.innerHTML = '';
@@ -961,14 +872,13 @@
                     item.longitude
                 );
                 if (distance <= 200) {
-                    const listItem = document.createElement('li');
-                    const itemButton = document.createElement('button');
-                    itemButton.textContent = `${item.name} (${distance.toFixed(1)}m)`;
-                    itemButton.addEventListener('click', () => {
+                    const li = document.createElement('li');
+                    const btn = document.createElement('button');
+                    btn.textContent = `${item.name} (${distance.toFixed(1)}m)`;
+                    
+                    btn.addEventListener('click', () => {
                         if (item.longitude && item.latitude) {
                             map.flyTo({ center: [item.longitude, item.latitude] });
-                            console.log(`Centrage de la carte sur ${isBeacon ? 'le beacon' : 'le tracker'} ${item.name}`);
-                            
                             const marker = isBeacon ? beaconMarkers[item.id] : markers[item.deviceId];
                             if (marker) {
                                 openPopup(marker.getPopup());
@@ -976,17 +886,16 @@
                         }
                     });
 
-                    listItem.appendChild(itemButton);
-                    depotList.appendChild(listItem);
+                    li.appendChild(btn);
+                    depotList.appendChild(li);
                 }
             }
 
             trackers.forEach(tracker => {
                 if (typeof tracker.latitude === 'number' && typeof tracker.longitude === 'number') {
-                    addDepotListItem(tracker);
+                    addDepotListItem(tracker, false);
                 }
             });
-
             Object.values(beacons).forEach(beacon => {
                 if (typeof beacon.latitude === 'number' && typeof beacon.longitude === 'number') {
                     addDepotListItem(beacon, true);
@@ -1000,16 +909,21 @@
             }
         }
 
+        /**
+         * Boutons de basculement
+         */
         function setupToggleButtons() {
             document.getElementById('toggle-controls').addEventListener('click', () => {
                 document.getElementById('controls-container').classList.toggle('active');
             });
-
             document.getElementById('toggle-depot').addEventListener('click', () => {
                 document.getElementById('depot-container').classList.toggle('active');
             });
         }
 
+        /**
+         * Switch pour changer style de la carte
+         */
         function setupMapSwitch() {
             document.getElementById('map-switch').addEventListener('change', (event) => {
                 if (event.target.checked) {
@@ -1018,13 +932,16 @@
                     map.setStyle('mapbox://styles/mapbox/streets-v11');
                 }
             });
-
+            // Quand le style recharge, on ré-ajoute les marqueurs
             map.on('style.load', () => {
-                Object.values(beaconMarkers).forEach(marker => marker.addTo(map));
                 Object.values(markers).forEach(marker => marker.addTo(map));
+                Object.values(beaconMarkers).forEach(marker => marker.addTo(map));
             });
         }
 
+        /**
+         * Suggestions
+         */
         function displaySuggestions(query) {
             fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
                 .then(response => response.json())
@@ -1033,14 +950,12 @@
                     if (data.features.length > 0) {
                         suggestionsList.style.display = 'block';
                         data.features.forEach((feature) => {
-                            const suggestionItem = document.createElement('li');
-                            suggestionItem.textContent = feature.place_name;
-                            suggestionItem.addEventListener('click', () => {
+                            const li = document.createElement('li');
+                            li.textContent = feature.place_name;
+                            li.addEventListener('click', () => {
                                 const [lng, lat] = feature.center;
                                 map.flyTo({ center: [lng, lat] });
-                                if (searchMarker) {
-                                    searchMarker.remove();
-                                }
+                                if (searchMarker) searchMarker.remove();
                                 const popup = new mapboxgl.Popup({ closeButton: false })
                                     .setHTML(`<strong>Résultat:</strong> ${feature.place_name}`);
                                 
@@ -1053,7 +968,7 @@
                                 suggestionsList.style.display = 'none';
                                 searchInput.value = feature.place_name;
                             });
-                            suggestionsList.appendChild(suggestionItem);
+                            suggestionsList.appendChild(li);
                         });
                     } else {
                         suggestionsList.style.display = 'none';
@@ -1064,42 +979,27 @@
                 });
         }
 
-        searchInput.addEventListener('input', (event) => {
-            const query = event.target.value.trim();
-            if (query.length > 2) {
-                displaySuggestions(query);
-            } else {
-                suggestionsList.style.display = 'none';
-            }
-        });
-
-        document.addEventListener('click', (event) => {
-            if (!searchInput.contains(event.target) && !suggestionsList.contains(event.target)) {
-                suggestionsList.style.display = 'none';
-            }
-        });
-
+        /**
+         * Événements de recherche
+         */
         function setupSearch() {
             document.getElementById('search-button').addEventListener('click', () => {
-                const query = document.getElementById('search-input').value;
-                if (query.trim() === '') {
+                const query = searchInput.value.trim();
+                if (!query) {
                     alert('Veuillez entrer une adresse à rechercher.');
                     return;
                 }
-
                 fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
                     .then(response => response.json())
                     .then(data => {
-                        if (data.features.length === 0) {
+                        if (!data.features.length) {
                             alert('Aucun résultat trouvé pour cette adresse.');
                             return;
                         }
                         const firstResult = data.features[0];
                         const [lng, lat] = firstResult.center;
                         map.flyTo({ center: [lng, lat] });
-                        if (searchMarker) {
-                            searchMarker.remove();
-                        }
+                        if (searchMarker) searchMarker.remove();
                         const popup = new mapboxgl.Popup({ closeButton: false })
                             .setHTML(`<strong>Résultat:</strong> ${firstResult.place_name}`);
                         searchMarker = new mapboxgl.Marker({ color: 'red' })
@@ -1107,26 +1007,43 @@
                             .setPopup(popup)
                             .addTo(map);
                         openPopup(popup);
-                        console.log(`Adresse trouvée: ${firstResult.place_name} à [${lng}, ${lat}]`);
                     })
                     .catch(error => {
                         console.error('Erreur lors de la géocodage:', error);
                         alert('Une erreur est survenue lors de la recherche de l\'adresse.');
                     });
             });
-        }
 
-        function setupMapClickListener() {
-            map.on('click', () => {
-                // removeRoute();
-                // hideTimeline();
-                // if (timelineMarker) {
-                //     timelineMarker.remove();
-                //     timelineMarker = null;
-                // }
+            // Suggestions "live"
+            searchInput.addEventListener('input', (event) => {
+                const query = event.target.value.trim();
+                if (query.length > 2) {
+                    displaySuggestions(query);
+                } else {
+                    suggestionsList.style.display = 'none';
+                }
+            });
+            document.addEventListener('click', (event) => {
+                if (!searchInput.contains(event.target) && !suggestionsList.contains(event.target)) {
+                    suggestionsList.style.display = 'none';
+                }
             });
         }
 
+        /**
+         * Cliquer sur la carte
+         */
+        function setupMapClickListener() {
+            map.on('click', () => {
+                // Selon vos besoins, vous pourriez enlever le route, la timeline, etc.
+                // removeRoute();
+                // hideTimeline();
+            });
+        }
+
+        /**
+         * Bouton "Afficher Route"
+         */
         function setupRouteButton() {
             document.getElementById('route-button').addEventListener('click', () => {
                 const selectedValue = document.getElementById('tracker-select').value;
@@ -1134,13 +1051,10 @@
                     alert('Veuillez sélectionner un tracker ou beacon pour afficher la route.');
                     return;
                 }
-
                 const firstDashIndex = selectedValue.indexOf('-');
-                let type, id;
-                if (firstDashIndex === -1) {
-                    type = 'tracker';
-                    id = selectedValue;
-                } else {
+                let type = 'tracker';
+                let id = selectedValue;
+                if (firstDashIndex !== -1) {
                     type = selectedValue.substring(0, firstDashIndex);
                     id = selectedValue.substring(firstDashIndex + 1);
                 }
@@ -1171,7 +1085,10 @@
                             return;
                         }
                         data.sort((a, b) => new Date(a.time) - new Date(b.time));
-                        const coordinates = data.map(position => [parseFloat(position.longitude), parseFloat(position.latitude)]);
+                        const coordinates = data.map(position => [
+                            parseFloat(position.longitude),
+                            parseFloat(position.latitude)
+                        ]);
                         timelineData = data.map(position => ({
                             time: new Date(position.deviceTime),
                             coordinates: [parseFloat(position.longitude), parseFloat(position.latitude)]
@@ -1183,12 +1100,15 @@
                         console.error('Erreur lors de la récupération des données de la route:', error);
                         alert('Une erreur est survenue lors de la récupération des données de la route.');
                     });
-                } else if (type === 'beacon') {
+                } else {
                     alert('La fonctionnalité de route n\'est pas disponible pour les beacons.');
                 }
             });
         }
 
+        /**
+         * Ajouter la route sur la carte
+         */
         function addRouteToMap(coordinates) {
             removeRoute();
             map.addSource(routeLayerId, {
@@ -1215,9 +1135,11 @@
                     'line-width': 4
                 }
             });
-            console.log('Route ajoutée à la carte.');
         }
 
+        /**
+         * Retirer la route
+         */
         function removeRoute() {
             if (map && map.getLayer(routeLayerId)) {
                 map.removeLayer(routeLayerId);
@@ -1225,19 +1147,19 @@
             if (map && map.getSource(routeLayerId)) {
                 map.removeSource(routeLayerId);
             }
-            console.log('Route supprimée de la carte.');
         }
 
+        /**
+         * Initialiser la timeline
+         */
         function initializeTimeline() {
             const timelineContainer = document.getElementById('timeline-container');
             const timeline = document.getElementById('timeline');
             const currentTimeDisplay = document.getElementById('current-time');
 
             if (timelineData.length === 0) {
-                console.log('Aucune donnée pour la timeline.');
                 return;
             }
-
             timelineContainer.style.display = 'flex';
             timeline.min = 0;
             timeline.max = timelineData.length - 1;
@@ -1248,7 +1170,6 @@
                 timelineMarker.remove();
                 timelineMarker = null;
             }
-
             timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' })
                 .setLngLat(timelineData[0].coordinates)
                 .addTo(map);
@@ -1269,6 +1190,9 @@
             });
         }
 
+        /**
+         * Cacher la timeline
+         */
         function hideTimeline() {
             const timelineContainer = document.getElementById('timeline-container');
             timelineContainer.style.display = 'none';
@@ -1278,6 +1202,9 @@
             currentTimeDisplay.textContent = '00:00:00';
         }
 
+        /**
+         * Format heure
+         */
         function formatTime(date) {
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -1285,7 +1212,11 @@
             return `${hours}:${minutes}:${seconds}`;
         }
 
+        /**
+         * Initialiser la carte (appelé après saisie des identifiants)
+         */
         function initializeMap() {
+            // Charger le JSON de définition des beacons
             fetch('https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json')
                 .then(response => {
                     if (!response.ok) {
@@ -1295,7 +1226,6 @@
                 })
                 .then(data => {
                     beaconDefinitions = data;
-                    console.log('Définitions des beacons chargées:', beaconDefinitions);
 
                     mapboxgl.accessToken = MAPBOX_API_KEY;
                     map = new mapboxgl.Map({
@@ -1310,6 +1240,7 @@
                         getTrackersData();
                         updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
 
+                        // Tenter la géoloc de l'utilisateur
                         if (navigator.geolocation) {
                             navigator.geolocation.getCurrentPosition(
                                 (pos) => {
@@ -1320,6 +1251,7 @@
                                         .setLngLat([longitude, latitude])
                                         .setPopup(myLocationPopup)
                                         .addTo(map);
+                                    
                                     myLocationMarker.getElement().addEventListener('click', () => {
                                         openPopup(myLocationMarker.getPopup());
                                     });
@@ -1332,12 +1264,14 @@
                         }
                     });
 
+                    // Écouteurs
                     setupMapClickListener();
                     setupToggleButtons();
                     setupMapSwitch();
                     setupSearch();
                     setupRouteButton();
 
+                    // Afficher les éléments d'UI
                     document.getElementById('search-container').style.display = 'flex';
                     document.getElementById('toggle-controls').style.display = 'flex';
                     document.getElementById('toggle-depot').style.display = 'flex';
@@ -1349,6 +1283,9 @@
                 });
         }
 
+        /**
+         * Gestion du formulaire de connexion
+         */
         document.getElementById('credentials-form').addEventListener('submit', (event) => {
             event.preventDefault();
             const mapboxKeyInput = document.getElementById('mapbox-key').value.trim();
@@ -1359,20 +1296,25 @@
                 alert('Veuillez remplir tous les champs.');
                 return;
             }
-
             MAPBOX_API_KEY = mapboxKeyInput;
             TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
+
+            // Fermer le modal
             document.getElementById('credentials-modal').style.display = 'none';
+
+            // Initialiser la carte
             initializeMap();
         });
 
+        /**
+         * Stopper les updates
+         */
         function stopUpdatingPositions() {
             if (updateIntervalId) {
                 clearInterval(updateIntervalId);
                 updateIntervalId = null;
             }
         }
-
         window.addEventListener('beforeunload', () => {
             stopUpdatingPositions();
         });
