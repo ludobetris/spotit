@@ -584,7 +584,7 @@
         let beacons = {};
         let beaconMarkers = {};
 
-        // Variable pour n'afficher qu'une popup à la fois (si besoin)
+        // Variable pour n'afficher qu'une popup à la fois
         let currentPopup = null;
 
         // Définir une variable pour stocker les définitions des beacons
@@ -628,12 +628,8 @@
             return R * c;
         }
 
-        // On modifie openPopup pour ne plus fermer l'ancien popup
+        // On modifie openPopup pour ne plus fermer l'ancien popup automatiquement
         function openPopup(popup) {
-            // En commentaire, ce qui fermait le popup précédent :
-            // if (currentPopup) {
-            //     currentPopup.remove();
-            // }
             currentPopup = popup;
             currentPopup.addTo(map);
         }
@@ -690,7 +686,6 @@
 
             // On affiche un texte de chargement pendant la récupération des données
             const batteryModalContent = document.getElementById('battery-modal-content');
-            // Pour éviter de cumuler plusieurs paragraphes "Chargement...", on le retire si déjà présent
             const oldLoading = document.getElementById('battery-loading-text');
             if (oldLoading) oldLoading.remove();
 
@@ -699,7 +694,7 @@
             loadingText.innerText = 'Chargement...';
             batteryModalContent.appendChild(loadingText);
 
-            // On détruit le chart existant s'il y en a un, pour ne pas l'afficher pendant le chargement
+            // On détruit le chart existant s'il y en a un
             if (batteryChart) {
                 batteryChart.destroy();
                 batteryChart = null;
@@ -739,7 +734,7 @@
                 return response.json();
             })
             .then(data => {
-                // On retire le message de chargement
+                // Retirer le message de chargement
                 const loadTxt = document.getElementById('battery-loading-text');
                 if (loadTxt) loadTxt.remove();
 
@@ -765,7 +760,7 @@
                     return;
                 }
                 const ctx = document.getElementById('battery-chart').getContext('2d');
-                // Détruire le chart s'il existe déjà (par sécurité supplémentaire)
+                // Détruire le chart s'il existe déjà
                 if (batteryChart) {
                     batteryChart.destroy();
                 }
@@ -808,7 +803,7 @@
                 });
             })
             .catch(err => {
-                // On retire le message de chargement même si erreur
+                // Retirer le message de chargement même en cas d'erreur
                 const loadTxt = document.getElementById('battery-loading-text');
                 if (loadTxt) loadTxt.remove();
 
@@ -1002,6 +997,7 @@
                 checkbox.type = 'checkbox';
                 checkbox.classList.add('group-checkbox');
                 checkbox.dataset.groupe = groupe;
+                // Coche par défaut si on l'avait déjà
                 checkbox.checked = checkedGroupsSet.has(groupe) ? true : false;
 
                 checkbox.addEventListener('change', (event) => {
@@ -1024,6 +1020,9 @@
         // Peupler le sélecteur de trackers et beacons
         function populateTrackerSelect() {
             const trackerSelect = document.getElementById('tracker-select');
+            // Mémoriser la valeur sélectionnée
+            const currentValue = trackerSelect.value;
+
             trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
 
             const combinedList = [
@@ -1046,6 +1045,9 @@
                 option.textContent = item.name;
                 trackerSelect.appendChild(option);
             });
+
+            // Réaffecter la valeur sélectionnée si elle existe toujours
+            trackerSelect.value = currentValue;
 
             trackerSelect.removeEventListener('change', trackerSelectChangeHandler);
             trackerSelect.addEventListener('change', trackerSelectChangeHandler);
@@ -1090,8 +1092,7 @@
             if (!map) {
                 return;
             }
-            // Au lieu de tout supprimer, on va faire un "update" des marqueurs trackers,
-            // et supprimer uniquement ceux qui ne sont plus d'actualité.
+            // Au lieu de tout supprimer, on va faire un "update" des marqueurs trackers
 
             const checkedGroups = Array.from(checkedGroupsSet);
 
@@ -1104,8 +1105,6 @@
 
                 visibleTrackerIds.push(String(t.deviceId));
 
-                // Si le marqueur existe déjà, on met juste à jour sa position.
-                // Sinon, on le crée.
                 let marker = markers[t.deviceId];
                 if (!marker) {
                     // Création du DOM
@@ -1157,7 +1156,7 @@
                     marker.addTo(map);
                     markers[t.deviceId] = marker;
                 } else {
-                    // On met à jour la position si le marqueur existe déjà
+                    // Mise à jour de la position
                     marker.setLngLat([t.longitude, t.latitude]);
                 }
             });
@@ -1170,7 +1169,7 @@
                 }
             });
 
-            // Gérer les beacons de la même manière
+            // Gérer les beacons
             const visibleBeaconIds = [];
             Object.values(beacons).forEach(b => {
                 if (!checkedGroups.includes(b.group)) return;
@@ -1393,10 +1392,7 @@
             });
         }
 
-        // -------------------
-        // NOUVELLE FONCTION : générer un gradient coloré pour la timeline
-        // Rouge si le tracker a bougé (> 5m) entre i et i+1, sinon gris.
-        // -------------------
+        // Créer la couleur de fond du slider timeline
         function createTimelineGradient(data) {
             if (!data || data.length < 2) {
                 return '#ccc'; // tout gris si pas de données
@@ -1417,6 +1413,7 @@
                 const endPercent = ((i+1) / total) * 100;
                 segments.push(`${color} ${startPercent}% ${endPercent}%`);
             }
+            // Ex: "linear-gradient(to right, red 0% 20%, gray 20% 100%)"
             return `linear-gradient(to right, ${segments.join(', ')})`;
         }
 
@@ -1475,6 +1472,12 @@
 
             // Quand on clique sur "Afficher Route"
             document.getElementById('route-button').addEventListener('click', () => {
+                // Fermer la popup en cours
+                if (currentPopup) {
+                    currentPopup.remove();
+                    currentPopup = null;
+                }
+
                 const val = document.getElementById('tracker-select').value;
                 if (!val) {
                     alert("Sélectionner un tracker ou un beacon.");
@@ -1553,7 +1556,7 @@
             timeline.value = 0;
             currentTimeDisplay.textContent = formatTime(timelineData[0].time);
 
-            // Colorer le slider
+            // Colorer le slider (rouge si >5m, gris sinon)
             timeline.style.background = createTimelineGradient(timelineData);
 
             if (timelineMarker) {
