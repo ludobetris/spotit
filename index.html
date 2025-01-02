@@ -623,12 +623,13 @@
         let map; // Déclarer map comme variable globale
 
         // Variables globales pour stocker les données
-        let trackers = [];
+        let trackers = [];           // stockage de la dernière position
+        let devicePositionsMap = {}; // stockage des positions + tension pour tous (dernières 24h par device)
         let markers = {};
         let groups = []; // Liste des groupes
-        let groupIdToName = {}; // Mapping de groupId à groupName
-        let beacons = {}; // Pour stocker les beacons
-        let beaconMarkers = {}; // Pour stocker les marqueurs des beacons
+        let groupIdToName = {};
+        let beacons = {};
+        let beaconMarkers = {};
 
         // Variable pour n'afficher qu'une popup à la fois
         let currentPopup = null;
@@ -639,37 +640,31 @@
         // Coordonnées de référence pour "Rue des Etreys 38 à Grône"
         const depotCoordinates = [7.475422, 46.257917]; // [longitude, latitude]
 
-        // Variables pour les marqueurs de recherche et de route
-        let searchMarker = null;
+        // Variables pour la timeline
         let routeLayerId = 'tracker-route';
-        let timelineData = []; // Stocke les données pour la timeline
-        let timelineMarker = null; // Marqueur pour la timeline
+        let timelineData = [];
+        let timelineMarker = null;
 
-        // Références aux éléments de recherche et de suggestion
+        // Eléments de recherche
         const searchInput = document.getElementById('search-input');
         const suggestionsList = document.getElementById('suggestions-list');
 
-        // Intervalle de mise à jour des positions en millisecondes (e.g., 10000 ms = 10 secondes)
-        const UPDATE_INTERVAL = 10000; // 10 secondes
-        let updateIntervalId = null; // ID de l'intervalle pour pouvoir le nettoyer si nécessaire
+        // Intervalle de mise à jour en ms
+        const UPDATE_INTERVAL = 10000;
+        let updateIntervalId = null;
 
         // Ensemble pour conserver les groupes cochés
         let checkedGroupsSet = new Set();
 
-        // Historique de puissance/batterie (pour calculer la moyenne des 3 dernières valeurs)
-        let devicePowerHistory = {};
-
-        // Pour retenir le deviceID sélectionné pour le graphique
+        // Utilisé pour l'historique de tension dans le modal
         let currentBatteryDeviceId = null;
-
-        // Chart.js
         let batteryChart = null;
 
         // --- FONCTIONS UTILITAIRES ---
 
-        // Fonction de calcul de distance (Haversine)
+        // Calcul de distance (Haversine)
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // Rayon de la Terre en mètres
+            const R = 6371e3; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = 
@@ -677,50 +672,34 @@
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const d = R * c;
-            return d;
+            return R * c;
         }
 
-        // Fonction pour ouvrir une popup en fermant la précédente
         function openPopup(popup) {
             if (currentPopup) {
-                currentPopup.remove(); // Ferme la popup précédente
+                currentPopup.remove(); 
             }
             currentPopup = popup;
             currentPopup.addTo(map);
         }
 
-        // Fonction pour obtenir un offset (décalage) pour l'affichage des beacons
-        // en fonction du RSSI, pour les disposer autour du tracker
+        // Décalage beacon en fonction du RSSI
         function getBeaconOffset(rssi, index, total) {
-            /*
-              - On définit une distance minimale si le beacon est "très proche" (rssi >= -40).
-              - Plus le rssi est faible (valeur négative élevée en absolu),
-                plus on éloigne le beacon du tracker.
-              - On répartit les beacons autour du tracker grâce à un angle.
-            */
             const baseDistance = 0.00002; 
-            
-            // rssi >= -40 => beacon très proche, distance minimale
             let distance;
             if (rssi >= -40) {
                 distance = baseDistance; 
             } else {
                 distance = baseDistance + (Math.abs(rssi) - 40) * 0.000001; 
             }
-
-            // Calcul de l'angle pour disposer les beacons en éventail
             const angleDeg = (index - 1) * (360 / total);
             const angleRad = angleDeg * (Math.PI / 180);
 
-            // Décalage par rapport au tracker
             const offsetLng = distance * Math.cos(angleRad);
             const offsetLat = distance * Math.sin(angleRad);
-
             return { offsetLng, offsetLat };
         }
 
-        // Fonction pour récupérer l'icône de batterie selon la tension moyenne
         function getBatteryIcon(voltage) {
             if (voltage < 10.5) {
                 return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
@@ -735,7 +714,6 @@
             }
         }
 
-        // Fonction pour récupérer un texte explicatif selon la tension
         function getBatteryTooltip(voltage) {
             if (voltage < 10.5) {
                 return "Tension <10.5V : Batterie HS (soudure coupée ou décharge profonde).";
@@ -750,41 +728,35 @@
             }
         }
 
-        // Fonction pour ouvrir le modal du graphique
+        // Ouvrir le modal du graphique
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
             modal.style.display = 'flex';
         }
 
-        // Fonction pour fermer le modal du graphique
+        // Fermer le modal du graphique
         function closeVoltageChart() {
             const modal = document.getElementById('battery-modal');
             modal.style.display = 'none';
         }
 
-        // Fonction pour charger les données de tension via l'API Traccar et les afficher dans le graphique
+        // Charger les données de tension sur la période choisie
         function loadBatteryData(event) {
             event.preventDefault();
-
-            // Récupérer les dates du formulaire
             const fromDateInput = document.getElementById('battery-from-date').value;
             const toDateInput = document.getElementById('battery-to-date').value;
-
             if (!fromDateInput || !toDateInput) {
                 alert("Veuillez choisir une plage de dates.");
                 return;
             }
-
             if (!currentBatteryDeviceId) {
                 alert("Aucun deviceId sélectionné pour le graphique.");
                 return;
             }
-
             const fromISO = new Date(fromDateInput).toISOString();
             const toISO = new Date(toDateInput).toISOString();
 
-            // Requête pour récupérer les positions entre ces dates
             fetch(`https://demo2.traccar.org/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
                 method: 'GET',
                 headers: {
@@ -803,17 +775,11 @@
                     alert("Aucune donnée de tension trouvée sur cette période.");
                     return;
                 }
-
-                // Préparer les données pour le graphique : tension (power) en fonction du temps
                 const labels = [];
                 const powers = [];
-
-                // On trie par deviceTime
                 data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
-
                 data.forEach(pos => {
                     let pVal = pos.attributes?.power;
-                    // Tenter de parser
                     if (pVal !== undefined) {
                         const parsed = parseFloat(pVal);
                         if (!isNaN(parsed)) {
@@ -822,18 +788,14 @@
                         }
                     }
                 });
-
                 if (powers.length === 0) {
                     alert("Aucune donnée de tension (champ 'power') n'a été trouvée sur cette période.");
                     return;
                 }
-
-                // Créer ou mettre à jour le graphique
                 const ctx = document.getElementById('battery-chart').getContext('2d');
                 if (batteryChart) {
                     batteryChart.destroy();
                 }
-
                 batteryChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -878,26 +840,15 @@
             });
         }
 
-        // --- FIN FONCTIONS UTILITAIRES ---
+        // --- FONCTIONS PRINCIPALES ---
 
-        // Fonction pour obtenir les données des groupes, devices, et positions de Traccar
+        // 1) Récupère la liste des devices
+        // 2) Pour chaque device, on récupère la dernière position pour l'affichage direct
+        //    ET on récupère les positions des 24 dernières heures pour la tension éventuelle.
+        //    Ainsi, on pourra afficher sur la carte la tension si trouvée.
         async function getTrackersData() {
             try {
-                // 1. Fetch Groups
-                const groupsResponse = await fetch('https://demo2.traccar.org/api/groups', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Basic ' + TRACCAR_AUTH, 
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const groupsData = await groupsResponse.json();
-                groups = groupsData;
-                groups.forEach(group => {
-                    groupIdToName[group.id] = group.name;
-                });
-
-                // 2. Fetch Devices
+                // 1) Récupération liste des devices
                 const devicesResponse = await fetch('https://demo2.traccar.org/api/devices', {
                     method: 'GET',
                     headers: {
@@ -905,57 +856,128 @@
                         'Content-Type': 'application/json'
                     }
                 });
+                if (!devicesResponse.ok) {
+                    throw new Error("Erreur lors de la récupération des devices: " + devicesResponse.statusText);
+                }
                 const devicesData = await devicesResponse.json();
-                const deviceIdToInfo = {};
-                devicesData.forEach(device => {
-                    deviceIdToInfo[device.id] = {
-                        name: device.name || `Tracker ${device.id}`,
-                        group: device.groupId ? groupIdToName[device.groupId] || 'Autre' : 'Autre'
-                    };
-                });
 
-                // 3. Fetch Positions (Latest Positions)
-                const positionsResponse = await fetch('https://demo2.traccar.org/api/positions', {
+                // 2) Récupération de la liste des groupes
+                const groupsResponse = await fetch('https://demo2.traccar.org/api/groups', {
                     method: 'GET',
                     headers: {
                         'Authorization': 'Basic ' + TRACCAR_AUTH,
                         'Content-Type': 'application/json'
                     }
                 });
-                const positionsData = await positionsResponse.json();
+                if (!groupsResponse.ok) {
+                    throw new Error("Erreur lors de la récupération des groupes: " + groupsResponse.statusText);
+                }
+                const groupsData = await groupsResponse.json();
+                groups = groupsData;
+                groups.forEach(group => {
+                    groupIdToName[group.id] = group.name;
+                });
 
-                // 4. Associer name et group depuis devices data
-                trackers = positionsData.map(position => ({
-                    ...position,
-                    name: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].name) || `Tracker ${position.deviceId}`,
-                    group: (deviceIdToInfo[position.deviceId] && deviceIdToInfo[position.deviceId].group) || 'Autre',
-                    latitude: parseFloat(position.latitude),
-                    longitude: parseFloat(position.longitude),
-                    time: position.time
-                }));
+                // On prépare un tableau des devices avec groupe
+                // car on aura besoin de la dernière position (pour lat/lon) + tension
+                const now = new Date();
+                const dateTo = now.toISOString();
+                const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString(); // 24h en arrière
 
-                // Enregistrer l'historique de "power" pour la moyenne (3 dernières valeurs) PAR tracker
-                positionsData.forEach(pos => {
-                    const devId = pos.deviceId;
-                    if (!devicePowerHistory[devId]) {
-                        devicePowerHistory[devId] = [];
+                // On va stocker la dernière position globale + la tension trouvée sur la période
+                const finalDevices = [];
+
+                // Pour éviter de multiplier trop les requêtes, on va :
+                //  - Récupérer la liste des devices
+                //  - Pour chacun, on appelle /api/positions (24h)
+                //    On prend la "dernière" (par deviceTime) comme position courante
+                //    On calcule si "power" existe => on stocke la moyenne sur les 3 dernières occurrences
+                for (const dev of devicesData) {
+                    const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
+                    const positionsUrl = `https://demo2.traccar.org/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
+                    
+                    const positionsResp = await fetch(positionsUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Basic ' + TRACCAR_AUTH,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (!positionsResp.ok) {
+                        console.warn(`Erreur positions pour device ${dev.id}: ${positionsResp.statusText}`);
+                        continue; // on saute
                     }
-                    // Essayer de parser la valeur "power" si elle existe
-                    let powerRaw = pos.attributes?.power;
-                    if (powerRaw !== undefined) {
-                        const parsedPower = parseFloat(powerRaw);
-                        if (!isNaN(parsedPower)) {
-                            devicePowerHistory[devId].push(parsedPower);
-                            // On ne garde que les 3 dernières
-                            if (devicePowerHistory[devId].length > 3) {
-                                devicePowerHistory[devId].shift();
+                    const positionsData = await positionsResp.json();
+                    if (!positionsData || positionsData.length === 0) {
+                        // Aucune data sur 24h
+                        finalDevices.push({
+                            deviceId: dev.id,
+                            name: dev.name || `Tracker ${dev.id}`,
+                            group: devGroup,
+                            latitude: null,
+                            longitude: null,
+                            hasPositions: false,
+                            avgVoltage: null
+                        });
+                        continue;
+                    }
+                    // trier par date
+                    positionsData.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
+
+                    // On prend la dernière comme position courante
+                    const lastPos = positionsData[positionsData.length - 1];
+                    const lat = parseFloat(lastPos.latitude);
+                    const lon = parseFloat(lastPos.longitude);
+
+                    // On calcule la moyenne sur 3 dernières occurrences du champ power
+                    let powers = [];
+                    // On va prendre les positionsData "du fond" pour ne garder que 3 occurrences
+                    for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
+                        let pVal = positionsData[i].attributes?.power;
+                        if (pVal !== undefined) {
+                            const parsed = parseFloat(pVal);
+                            if (!isNaN(parsed)) {
+                                powers.push(parsed);
                             }
                         }
                     }
-                });
 
-                // Traitement des beacons détectés par les trackers
-                positionsData.forEach(position => {
+                    let avgV = null;
+                    if (powers.length > 0) {
+                        const sum = powers.reduce((acc, val) => acc + val, 0);
+                        avgV = sum / powers.length;
+                        avgV = Math.round(avgV * 100) / 100; 
+                    }
+
+                    finalDevices.push({
+                        deviceId: dev.id,
+                        name: dev.name || `Tracker ${dev.id}`,
+                        group: devGroup,
+                        latitude: lat,
+                        longitude: lon,
+                        hasPositions: true,
+                        avgVoltage: avgV
+                    });
+                }
+
+                // On met trackers dans une variable globale
+                trackers = finalDevices;
+
+                // 3) On récupère les beacons via la position "la plus fraîche" (comme avant)
+                //    (Dans ce cas, on va juste demander la position "courante" via /api/positions
+                //     car c’est plus léger, et on reconstruit les beacons.)
+                const currentPositionsResp = await fetch('https://demo2.traccar.org/api/positions', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + TRACCAR_AUTH,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const currentPositionsData = await currentPositionsResp.json();
+
+                // Reconstruire beacons
+                beacons = {};
+                currentPositionsData.forEach(position => {
                     for (let i = 1; i <= 4; i++) {
                         const namespaceKey = `beacon${i}Namespace`;
                         const instanceKey = `beacon${i}Instance`;
@@ -972,7 +994,6 @@
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
-                            // Trouver le nom et l'icône du beacon (définitions)
                             let beaconName = `Beacon ${namespaceId} ${instanceId}`;
                             let beaconIconUrl = null;
                             const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
@@ -981,7 +1002,6 @@
                                 beaconIconUrl = beaconDef.iconUrl || null;
                             }
 
-                            // Mettre à jour la position si c'est la dernière détection
                             if (
                                 !beacons[beaconId] ||
                                 new Date(position.deviceTime) > new Date(beacons[beaconId].lastSeen)
@@ -1005,22 +1025,23 @@
                 populateTrackerSelect();
                 updateMap();
                 populateDepotList();
-            } catch (error) {
-                console.error('Erreur lors de la récupération des données:', error);
+
+            } catch (err) {
+                console.error('Erreur lors de la récupération des données trackers:', err);
                 alert('Une erreur est survenue lors de la récupération des données des trackers.');
             }
         }
 
-        // Fonction pour afficher les cases à cocher des groupes
+        // Afficher les cases à cocher des groupes
         function displayGroupCheckboxes() {
             const groupList = document.getElementById('group-list');
-            groupList.innerHTML = ''; // Clear existing list
+            groupList.innerHTML = '';
 
-            // Get unique groups from trackers and beacons
+            // Récupérer tous les groupes
             const uniqueGroups = [
                 ...new Set([
-                    ...trackers.map(tracker => tracker.group),
-                    ...Object.values(beacons).map(beacon => beacon.group)
+                    ...trackers.map(t => t.group),
+                    ...Object.values(beacons).map(b => b.group)
                 ])
             ].sort();
 
@@ -1029,12 +1050,7 @@
                 checkbox.type = 'checkbox';
                 checkbox.classList.add('group-checkbox');
                 checkbox.dataset.groupe = groupe;
-
-                if (checkedGroupsSet.has(groupe)) {
-                    checkbox.checked = true;
-                } else {
-                    checkbox.checked = false;
-                }
+                checkbox.checked = checkedGroupsSet.has(groupe) ? true : false;
 
                 checkbox.addEventListener('change', (event) => {
                     if (event.target.checked) {
@@ -1053,25 +1069,23 @@
             });
         }
 
-        // Fonction pour peupler le sélecteur de trackers et beacons triés par ordre alphabétique
+        // Peupler le sélecteur de trackers et beacons
         function populateTrackerSelect() {
             const trackerSelect = document.getElementById('tracker-select');
             trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
 
-            // Combiner trackers et beacons dans une seule liste
             const combinedList = [
-                ...trackers.map(tracker => ({
+                ...trackers.map(t => ({
                     type: 'tracker',
-                    id: tracker.deviceId,
-                    name: tracker.name
+                    id: t.deviceId,
+                    name: t.name
                 })),
-                ...Object.values(beacons).map(beacon => ({
+                ...Object.values(beacons).map(b => ({
                     type: 'beacon',
-                    id: beacon.id,
-                    name: beacon.name
+                    id: b.id,
+                    name: b.name
                 }))
             ];
-
             combinedList.sort((a, b) => a.name.localeCompare(b.name));
 
             combinedList.forEach(item => {
@@ -1085,35 +1099,34 @@
             trackerSelect.addEventListener('change', trackerSelectChangeHandler);
         }
 
-        // Gestionnaire d'événement pour le sélecteur de tracker/beacon
         function trackerSelectChangeHandler(event) {
-            const selectedValue = event.target.value;
-            if (!selectedValue) return;
-
-            const firstDashIndex = selectedValue.indexOf('-');
+            const val = event.target.value;
+            if (!val) return;
+            const idx = val.indexOf('-');
             let type, id;
-            if (firstDashIndex === -1) {
+            if (idx === -1) {
                 type = 'tracker';
-                id = selectedValue;
+                id = val;
             } else {
-                type = selectedValue.substring(0, firstDashIndex);
-                id = selectedValue.substring(firstDashIndex + 1);
+                type = val.substring(0, idx);
+                id = val.substring(idx+1);
             }
 
             if (type === 'tracker') {
-                const selectedTracker = trackers.find(t => t.deviceId == id);
-                if (selectedTracker && selectedTracker.latitude && selectedTracker.longitude) {
-                    map.flyTo({ center: [selectedTracker.longitude, selectedTracker.latitude] });
-                    const marker = markers[selectedTracker.deviceId];
+                const selected = trackers.find(t => String(t.deviceId) === String(id));
+                if (selected && selected.latitude && selected.longitude) {
+                    map.flyTo({ center: [selected.longitude, selected.latitude] });
+                    const marker = markers[selected.deviceId];
                     if (marker) {
                         openPopup(marker.getPopup());
                     }
                 }
-            } else if (type === 'beacon') {
-                const selectedBeacon = beacons[id];
-                if (selectedBeacon && selectedBeacon.latitude && selectedBeacon.longitude) {
-                    map.flyTo({ center: [selectedBeacon.longitude, selectedBeacon.latitude] });
-                    const marker = beaconMarkers[selectedBeacon.id];
+            } else {
+                // beacon
+                const bSel = beacons[id];
+                if (bSel && bSel.latitude && bSel.longitude) {
+                    map.flyTo({ center: [bSel.longitude, bSel.latitude] });
+                    const marker = beaconMarkers[bSel.id];
                     if (marker) {
                         openPopup(marker.getPopup());
                     }
@@ -1121,151 +1134,123 @@
             }
         }
 
-        // Fonction pour mettre à jour la carte en fonction des groupes sélectionnés
+        // Mise à jour de la carte
         function updateMap() {
             if (!map) {
-                console.warn('La carte n\'est pas encore initialisée.');
                 return;
             }
-
-            // Retire les marqueurs existants
-            Object.values(markers).forEach(marker => marker.remove());
+            Object.values(markers).forEach(m => m.remove());
             markers = {};
-
-            // Retire les marqueurs de beacons existants
-            Object.values(beaconMarkers).forEach(marker => marker.remove());
+            Object.values(beaconMarkers).forEach(m => m.remove());
             beaconMarkers = {};
 
             const checkedGroups = Array.from(checkedGroupsSet);
 
-            // Affiche les trackers
-            trackers.forEach(tracker => {
-                const groupe = tracker.group;
-                if (checkedGroups.includes(groupe)) {
-                    if (typeof tracker.longitude === 'number' && typeof tracker.latitude === 'number') {
-                        let markerElement;
-                        if (groupe.toLowerCase() === 'pickups') {
-                            markerElement = document.createElement('img');
-                            markerElement.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                            markerElement.style.width = '70px';
-                            markerElement.style.height = '70px';
-                            markerElement.style.objectFit = 'contain';
-                            markerElement.style.margin = '0';
-                            markerElement.style.padding = '0';
-                        } else if (groupe.toLowerCase() === 'chargeuse') {
-                            markerElement = document.createElement('img');
-                            markerElement.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
-                            markerElement.style.width = '70px';
-                            markerElement.style.height = '70px';
-                            markerElement.style.objectFit = 'contain';
-                            markerElement.style.margin = '0';
-                            markerElement.style.padding = '0';
-                        } else {
-                            markerElement = document.createElement('div');
-                            markerElement.style.width = '20px';
-                            markerElement.style.height = '20px';
-                            markerElement.style.borderRadius = '50%';
-                            markerElement.style.backgroundColor = 'orange';
-                        }
+            // Affichage trackers
+            trackers.forEach(t => {
+                if (!t.hasPositions) return; // pas de position => pas d'affichage
+                if (!checkedGroups.includes(t.group)) return;
+                if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
 
-                        // Popup
-                        let popupHTML = `<strong>Nom:</strong> ${tracker.name || "Inconnu"}`;
-                        
-                        // Calcul de la tension moyenne (3 dernières mesures)
-                        let avgVoltage = null;
-                        if (devicePowerHistory[tracker.deviceId] && devicePowerHistory[tracker.deviceId].length > 0) {
-                            const sum = devicePowerHistory[tracker.deviceId].reduce((acc, val) => acc + val, 0);
-                            avgVoltage = sum / devicePowerHistory[tracker.deviceId].length;
-                            avgVoltage = Math.round(avgVoltage * 100) / 100; 
-                        }
-
-                        if (avgVoltage !== null) {
-                            const iconUrl = getBatteryIcon(avgVoltage);
-                            const explanation = getBatteryTooltip(avgVoltage);
-
-                            popupHTML += `<br/><strong>Batterie:</strong> 
-                                <img src="${iconUrl}" alt="Battery" style="width:20px; vertical-align:middle; margin-right:5px;" />
-                                <a href="#" onclick="showVoltageChart(${tracker.deviceId}); return false;" 
-                                   title="${explanation}"
-                                   style="color:blue; text-decoration:underline;"
-                                >
-                                    ${avgVoltage} V
-                                </a>`;
-                        }
-
-                        const popup = new mapboxgl.Popup({ 
-                            closeButton: false,
-                            offset: 25 
-                        }).setHTML(popupHTML);
-
-                        const marker = new mapboxgl.Marker(markerElement)
-                            .setLngLat([tracker.longitude, tracker.latitude])
-                            .setPopup(popup);
-
-                        marker.getElement().addEventListener('click', () => {
-                            openPopup(marker.getPopup());
-                        });
-
-                        marker.addTo(map);
-                        markers[tracker.deviceId] = marker;
-                    }
+                let el;
+                if (t.group.toLowerCase() === 'pickups') {
+                    el = document.createElement('img');
+                    el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
+                    el.style.width = '70px';
+                    el.style.height = '70px';
+                } else if (t.group.toLowerCase() === 'chargeuse') {
+                    el = document.createElement('img');
+                    el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
+                    el.style.width = '70px';
+                    el.style.height = '70px';
+                } else {
+                    el = document.createElement('div');
+                    el.style.width = '20px';
+                    el.style.height = '20px';
+                    el.style.borderRadius = '50%';
+                    el.style.backgroundColor = 'orange';
                 }
+
+                let popupHTML = `<strong>Nom:</strong> ${t.name}`;
+                if (t.avgVoltage !== null) {
+                    const iconUrl = getBatteryIcon(t.avgVoltage);
+                    const explanation = getBatteryTooltip(t.avgVoltage);
+                    popupHTML += `<br/><strong>Batterie:</strong>
+                            <img src="${iconUrl}" alt="Battery" style="width:20px; vertical-align:middle; margin-right:5px;" />
+                            <a href="#" onclick="showVoltageChart(${t.deviceId}); return false;"
+                               title="${explanation}"
+                               style="color:blue; text-decoration:underline;">
+                                ${t.avgVoltage} V
+                            </a>`;
+                }
+
+                const popup = new mapboxgl.Popup({
+                    closeButton: false,
+                    offset: 25
+                }).setHTML(popupHTML);
+
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat([t.longitude, t.latitude])
+                    .setPopup(popup);
+
+                marker.getElement().addEventListener('click', () => {
+                    openPopup(marker.getPopup());
+                });
+                marker.addTo(map);
+                markers[t.deviceId] = marker;
             });
 
-            // Affiche les beacons
-            Object.values(beacons).forEach(beacon => {
-                const groupe = beacon.group;
-                if (checkedGroups.includes(groupe)) {
-                    if (typeof beacon.longitude === 'number' && typeof beacon.latitude === 'number') {
-                        let el;
-                        if (beacon.iconUrl) {
-                            el = document.createElement('img');
-                            el.src = beacon.iconUrl;
-                            el.style.width = '50px';
-                            el.style.height = '50px';
-                            el.style.objectFit = 'contain';
-                        } else {
-                            el = document.createElement('div');
-                            el.className = 'beacon-marker';
-                        }
+            // Affichage beacons
+            Object.values(beacons).forEach(b => {
+                if (!checkedGroups.includes(b.group)) return;
+                if (typeof b.longitude !== 'number' || typeof b.latitude !== 'number') return;
 
-                        const popup = new mapboxgl.Popup({ 
-                            closeButton: false,
-                            offset: 25 
-                        }).setHTML(`<strong>Nom:</strong> ${beacon.name || "Beacon"}<br><strong>RSSI:</strong> ${beacon.rssi}`);
-
-                        const marker = new mapboxgl.Marker(el)
-                            .setLngLat([beacon.longitude, beacon.latitude])
-                            .setPopup(popup);
-
-                        marker.getElement().addEventListener('click', () => {
-                            openPopup(marker.getPopup());
-                        });
-
-                        marker.addTo(map);
-                        beaconMarkers[beacon.id] = marker;
-                    }
+                let el;
+                if (b.iconUrl) {
+                    el = document.createElement('img');
+                    el.src = b.iconUrl;
+                    el.style.width = '50px';
+                    el.style.height = '50px';
+                } else {
+                    el = document.createElement('div');
+                    el.className = 'beacon-marker';
                 }
+
+                const popup = new mapboxgl.Popup({
+                    closeButton: false,
+                    offset: 25
+                }).setHTML(`<strong>Nom:</strong> ${b.name}<br><strong>RSSI:</strong> ${b.rssi}`);
+
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat([b.longitude, b.latitude])
+                    .setPopup(popup);
+
+                marker.getElement().addEventListener('click', () => {
+                    openPopup(marker.getPopup());
+                });
+
+                marker.addTo(map);
+                beaconMarkers[b.id] = marker;
             });
         }
 
-        // Fonction pour peupler la liste "Dépôt" avec les trackers et beacons dans un rayon de 200m
+        // Peupler la liste "Dépôt"
         function populateDepotList() {
             const depotList = document.getElementById('depot-list');
             depotList.innerHTML = '';
 
-            function addDepotListItem(item, isBeacon = false) {
-                const distance = getDistanceFromLatLonInMeters(
+            function addDepotListItem(item, isBeacon=false) {
+                const dist = getDistanceFromLatLonInMeters(
                     depotCoordinates[1],
                     depotCoordinates[0],
                     item.latitude,
                     item.longitude
                 );
-                if (distance <= 200) {
-                    const listItem = document.createElement('li');
-                    const itemButton = document.createElement('button');
-                    itemButton.textContent = `${item.name} (${distance.toFixed(1)}m)`;
-                    itemButton.addEventListener('click', () => {
+                if (dist <= 200) {
+                    const li = document.createElement('li');
+                    const btn = document.createElement('button');
+                    btn.textContent = `${item.name} (${dist.toFixed(1)}m)`;
+                    btn.addEventListener('click', () => {
                         if (item.longitude && item.latitude) {
                             map.flyTo({ center: [item.longitude, item.latitude] });
                             const marker = isBeacon ? beaconMarkers[item.id] : markers[item.deviceId];
@@ -1274,31 +1259,33 @@
                             }
                         }
                     });
-                    listItem.appendChild(itemButton);
-                    depotList.appendChild(listItem);
+                    li.appendChild(btn);
+                    depotList.appendChild(li);
                 }
             }
 
-            trackers.forEach(tracker => {
-                if (typeof tracker.latitude === 'number' && typeof tracker.longitude === 'number') {
-                    addDepotListItem(tracker);
+            // trackers
+            trackers.forEach(t => {
+                if (!t.hasPositions) return;
+                if (typeof t.latitude === 'number' && typeof t.longitude === 'number') {
+                    addDepotListItem(t);
                 }
             });
-
-            Object.values(beacons).forEach(beacon => {
-                if (typeof beacon.latitude === 'number' && typeof beacon.longitude === 'number') {
-                    addDepotListItem(beacon, true);
+            // beacons
+            Object.values(beacons).forEach(b => {
+                if (typeof b.latitude === 'number' && typeof b.longitude === 'number') {
+                    addDepotListItem(b, true);
                 }
             });
 
             if (depotList.children.length === 0) {
-                const noTrackersItem = document.createElement('li');
-                noTrackersItem.textContent = "Aucun tracker ni beacon dans un rayon de 200m.";
-                depotList.appendChild(noTrackersItem);
+                const li = document.createElement('li');
+                li.textContent = "Aucun tracker ni beacon dans un rayon de 200m.";
+                depotList.appendChild(li);
             }
         }
 
-        // Ajouter des écouteurs pour les boutons de basculement
+        // Boutons basculement
         function setupToggleButtons() {
             document.getElementById('toggle-controls').addEventListener('click', () => {
                 document.getElementById('controls-container').classList.toggle('active');
@@ -1308,7 +1295,7 @@
             });
         }
 
-        // Ajouter un écouteur pour le switch de la vue de la carte
+        // Switch vue carte
         function setupMapSwitch() {
             document.getElementById('map-switch').addEventListener('change', (event) => {
                 if (event.target.checked) {
@@ -1318,28 +1305,26 @@
                 }
             });
             map.on('style.load', () => {
-                Object.values(beaconMarkers).forEach(marker => marker.addTo(map));
-                Object.values(markers).forEach(marker => marker.addTo(map));
+                Object.values(beaconMarkers).forEach(m => m.addTo(map));
+                Object.values(markers).forEach(m => m.addTo(map));
             });
         }
 
-        // Fonction pour afficher les suggestions
+        // Suggestions d'adresse
         function displaySuggestions(query) {
             fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
-                .then(response => response.json())
+                .then(r => r.json())
                 .then(data => {
                     suggestionsList.innerHTML = '';
                     if (data.features.length > 0) {
                         suggestionsList.style.display = 'block';
-                        data.features.forEach((feature) => {
-                            const suggestionItem = document.createElement('li');
-                            suggestionItem.textContent = feature.place_name;
-                            suggestionItem.addEventListener('click', () => {
+                        data.features.forEach(feature => {
+                            const li = document.createElement('li');
+                            li.textContent = feature.place_name;
+                            li.addEventListener('click', () => {
                                 const [lng, lat] = feature.center;
                                 map.flyTo({ center: [lng, lat] });
-                                if (searchMarker) {
-                                    searchMarker.remove();
-                                }
+                                if (searchMarker) searchMarker.remove();
                                 const popup = new mapboxgl.Popup({ closeButton: false })
                                     .setHTML(`<strong>Résultat:</strong> ${feature.place_name}`);
                                 searchMarker = new mapboxgl.Marker({ color: 'red' })
@@ -1350,71 +1335,67 @@
                                 suggestionsList.style.display = 'none';
                                 searchInput.value = feature.place_name;
                             });
-                            suggestionsList.appendChild(suggestionItem);
+                            suggestionsList.appendChild(li);
                         });
                     } else {
                         suggestionsList.style.display = 'none';
                     }
                 })
-                .catch(error => {
-                    console.error('Erreur lors de la récupération des suggestions:', error);
+                .catch(err => {
+                    console.error('Erreur suggestions:', err);
                 });
         }
 
-        // Écouter les saisies dans la barre de recherche pour afficher les suggestions
-        searchInput.addEventListener('input', (event) => {
-            const query = event.target.value.trim();
-            if (query.length > 2) {
-                displaySuggestions(query);
-            } else {
-                suggestionsList.style.display = 'none';
-            }
-        });
-
-        // Cacher les suggestions si on clique ailleurs
-        document.addEventListener('click', (event) => {
-            if (!searchInput.contains(event.target) && !suggestionsList.contains(event.target)) {
-                suggestionsList.style.display = 'none';
-            }
-        });
-
-        // Ajouter un écouteur pour la barre de recherche
+        // Barre de recherche
         function setupSearch() {
             document.getElementById('search-button').addEventListener('click', () => {
-                const query = document.getElementById('search-input').value;
-                if (query.trim() === '') {
+                const q = searchInput.value.trim();
+                if (!q) {
                     alert('Veuillez entrer une adresse à rechercher.');
                     return;
                 }
-                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
-                    .then(response => response.json())
+                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_API_KEY}`)
+                    .then(r => r.json())
                     .then(data => {
-                        if (data.features.length === 0) {
-                            alert('Aucun résultat trouvé pour cette adresse.');
+                        if (!data.features.length) {
+                            alert("Aucun résultat trouvé.");
                             return;
                         }
-                        const firstResult = data.features[0];
-                        const [lng, lat] = firstResult.center;
+                        const f0 = data.features[0];
+                        const [lng, lat] = f0.center;
                         map.flyTo({ center: [lng, lat] });
-                        if (searchMarker) {
-                            searchMarker.remove();
-                        }
+                        if (searchMarker) searchMarker.remove();
                         const popup = new mapboxgl.Popup({ closeButton: false })
-                            .setHTML(`<strong>Résultat:</strong> ${firstResult.place_name}`);
+                            .setHTML(`<strong>Résultat:</strong> ${f0.place_name}`);
                         searchMarker = new mapboxgl.Marker({ color: 'red' })
                             .setLngLat([lng, lat])
                             .setPopup(popup)
                             .addTo(map);
                         openPopup(popup);
                     })
-                    .catch(error => {
-                        console.error('Erreur lors de la géocodage:', error);
+                    .catch(err => {
+                        console.error('Erreur géocodage:', err);
                         alert('Une erreur est survenue lors de la recherche de l\'adresse.');
                     });
             });
+
+            searchInput.addEventListener('input', (ev) => {
+                const q = ev.target.value.trim();
+                if (q.length > 2) {
+                    displaySuggestions(q);
+                } else {
+                    suggestionsList.style.display = 'none';
+                }
+            });
+
+            document.addEventListener('click', (ev) => {
+                if (!searchInput.contains(ev.target) && !suggestionsList.contains(ev.target)) {
+                    suggestionsList.style.display = 'none';
+                }
+            });
         }
 
-        // Ajouter un écouteur pour éventuellement supprimer la route ou la timeline quand on clique sur la carte
+        // Click sur la carte => enlever route + timeline
         function setupMapClickListener() {
             map.on('click', () => {
                 removeRoute();
@@ -1426,95 +1407,90 @@
             });
         }
 
-        // Fonction pour afficher la route du tracker sélectionné
+        // Bouton route
         function setupRouteButton() {
             document.getElementById('route-button').addEventListener('click', () => {
-                const selectedValue = document.getElementById('tracker-select').value;
-                if (!selectedValue) {
-                    alert('Veuillez sélectionner un tracker ou beacon pour afficher la route.');
+                const val = document.getElementById('tracker-select').value;
+                if (!val) {
+                    alert("Sélectionner un tracker ou un beacon.");
                     return;
                 }
-                const firstDashIndex = selectedValue.indexOf('-');
+                const idx = val.indexOf('-');
                 let type, id;
-                if (firstDashIndex === -1) {
+                if (idx === -1) {
                     type = 'tracker';
-                    id = selectedValue;
+                    id = val;
                 } else {
-                    type = selectedValue.substring(0, firstDashIndex);
-                    id = selectedValue.substring(firstDashIndex + 1);
+                    type = val.substring(0, idx);
+                    id = val.substring(idx+1);
                 }
                 if (type === 'tracker') {
-                    const trackerId = id;
+                    // route du jour
                     const now = new Date();
                     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
                     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
-                    fetch(`https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
-                        method: 'GET',
+                    fetch(`https://demo2.traccar.org/api/positions?deviceId=${id}&from=${startOfDay}&to=${endOfDay}`, {
                         headers: {
                             'Authorization': 'Basic ' + TRACCAR_AUTH,
                             'Content-Type': 'application/json'
                         }
                     })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Erreur route: ' + response.statusText);
-                        }
-                        return response.json();
+                    .then(r => {
+                        if (!r.ok) throw new Error("Erreur route: " + r.statusText);
+                        return r.json();
                     })
                     .then(data => {
                         if (!data.length) {
-                            alert('Aucune donnée de route disponible pour ce tracker aujourd\'hui.');
+                            alert("Aucune donnée de route pour aujourd'hui.");
                             return;
                         }
                         data.sort((a, b) => new Date(a.time) - new Date(b.time));
-                        const coordinates = data.map(position => [parseFloat(position.longitude), parseFloat(position.latitude)]);
-                        timelineData = data.map(position => ({
-                            time: new Date(position.deviceTime),
-                            coordinates: [parseFloat(position.longitude), parseFloat(position.latitude)]
+                        const coords = data.map(p => [parseFloat(p.longitude), parseFloat(p.latitude)]);
+                        timelineData = data.map(p => ({
+                            time: new Date(p.deviceTime),
+                            coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)]
                         }));
-                        addRouteToMap(coordinates);
+                        addRouteToMap(coords);
                         initializeTimeline();
                     })
-                    .catch(error => {
-                        console.error('Erreur lors de la récupération de la route:', error);
-                        alert('Une erreur est survenue lors de la récupération des données de la route.');
+                    .catch(err => {
+                        console.error(err);
+                        alert("Erreur lors de la récupération de la route.");
                     });
-                } else if (type === 'beacon') {
-                    alert('La fonctionnalité de route n\'est pas disponible pour les beacons.');
+                } else {
+                    alert("La fonctionnalité de route n'est pas dispo pour les beacons.");
                 }
             });
         }
 
-        // Fonction pour ajouter la route à la carte
-        function addRouteToMap(coordinates) {
+        function addRouteToMap(coords) {
             removeRoute();
             map.addSource(routeLayerId, {
-                'type': 'geojson',
-                'data': {
-                    'type': 'Feature',
-                    'properties': {},
-                    'geometry': {
-                        'type': 'LineString',
-                        'coordinates': coordinates
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: coords
                     }
                 }
             });
             map.addLayer({
-                'id': routeLayerId,
-                'type': 'line',
-                'source': routeLayerId,
-                'layout': {
+                id: routeLayerId,
+                type: 'line',
+                source: routeLayerId,
+                layout: {
                     'line-join': 'round',
                     'line-cap': 'round'
                 },
-                'paint': {
+                paint: {
                     'line-color': '#FF0000',
                     'line-width': 4
                 }
             });
         }
 
-        // Fonction pour supprimer la route de la carte
         function removeRoute() {
             if (map && map.getLayer(routeLayerId)) {
                 map.removeLayer(routeLayerId);
@@ -1524,19 +1500,17 @@
             }
         }
 
-        // Fonction pour initialiser la timeline
         function initializeTimeline() {
             const timelineContainer = document.getElementById('timeline-container');
             const timeline = document.getElementById('timeline');
             const currentTimeDisplay = document.getElementById('current-time');
-            if (timelineData.length === 0) {
-                return;
-            }
+            if (!timelineData.length) return;
             timelineContainer.style.display = 'flex';
             timeline.min = 0;
             timeline.max = timelineData.length - 1;
             timeline.value = 0;
             currentTimeDisplay.textContent = formatTime(timelineData[0].time);
+
             if (timelineMarker) {
                 timelineMarker.remove();
                 timelineMarker = null;
@@ -1545,84 +1519,75 @@
                 .setLngLat(timelineData[0].coordinates)
                 .addTo(map);
 
-            timeline.addEventListener('input', (event) => {
-                const index = parseInt(event.target.value);
-                const position = timelineData[index];
-                if (!position) return;
-                currentTimeDisplay.textContent = formatTime(position.time);
+            timeline.addEventListener('input', (ev) => {
+                const i = parseInt(ev.target.value);
+                const pos = timelineData[i];
+                if (!pos) return;
+                currentTimeDisplay.textContent = formatTime(pos.time);
                 if (timelineMarker) {
-                    timelineMarker.setLngLat(position.coordinates);
+                    timelineMarker.setLngLat(pos.coordinates);
                 } else {
                     timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' })
-                        .setLngLat(position.coordinates)
+                        .setLngLat(pos.coordinates)
                         .addTo(map);
                 }
-                map.flyTo({ center: position.coordinates });
+                map.flyTo({ center: pos.coordinates });
             });
         }
 
-        // Fonction pour cacher la timeline
         function hideTimeline() {
             const timelineContainer = document.getElementById('timeline-container');
             timelineContainer.style.display = 'none';
             const timeline = document.getElementById('timeline');
             timeline.value = 0;
-            const currentTimeDisplay = document.getElementById('current-time');
-            currentTimeDisplay.textContent = '00:00:00';
+            document.getElementById('current-time').textContent = '00:00:00';
         }
 
-        // Fonction pour formater l'heure
         function formatTime(date) {
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            const seconds = String(date.getSeconds()).padStart(2, '0');
-            return `${hours}:${minutes}:${seconds}`;
+            const h = String(date.getHours()).padStart(2, '0');
+            const m = String(date.getMinutes()).padStart(2, '0');
+            const s = String(date.getSeconds()).padStart(2, '0');
+            return `${h}:${m}:${s}`;
         }
 
-        // Fonction pour initialiser la carte après la saisie des identifiants
+        // Initialiser la carte
         function initializeMap() {
-            // Charger les définitions des beacons depuis GitHub
+            // Chargement du beacons.json
             fetch('https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Erreur lors du chargement du fichier beacons.json');
-                    }
-                    return response.json();
+                .then(r => {
+                    if (!r.ok) throw new Error("Erreur beacons.json");
+                    return r.json();
                 })
                 .then(data => {
                     beaconDefinitions = data;
                     mapboxgl.accessToken = MAPBOX_API_KEY;
-
                     map = new mapboxgl.Map({
                         container: 'map',
                         style: 'mapbox://styles/mapbox/streets-v11',
                         center: [7.475422, 46.257917],
                         zoom: 14
                     });
-
                     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
                     map.on('load', () => {
                         getTrackersData();
                         updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
 
-                        // Tentative de géolocalisation de l'utilisateur
                         if (navigator.geolocation) {
                             navigator.geolocation.getCurrentPosition(
-                                (pos) => {
+                                pos => {
                                     const { latitude, longitude } = pos.coords;
-                                    const myLocationPopup = new mapboxgl.Popup({ closeButton: false })
+                                    const popup = new mapboxgl.Popup({ closeButton: false })
                                         .setHTML(`<strong>Ma localisation</strong>`);
-                                    const myLocationMarker = new mapboxgl.Marker({ color: 'blue' })
+                                    const marker = new mapboxgl.Marker({ color: 'blue' })
                                         .setLngLat([longitude, latitude])
-                                        .setPopup(myLocationPopup)
+                                        .setPopup(popup)
                                         .addTo(map);
-                                    myLocationMarker.getElement().addEventListener('click', () => {
-                                        openPopup(myLocationMarker.getPopup());
+                                    marker.getElement().addEventListener('click', () => {
+                                        openPopup(marker.getPopup());
                                     });
                                 },
-                                (err) => {
-                                    console.warn('Géolocalisation indisponible ou refusée.', err);
+                                err => {
+                                    console.warn("Géolocalisation refusée:", err);
                                 },
                                 { enableHighAccuracy: true }
                             );
@@ -1637,33 +1602,32 @@
 
                     // Gérer la fermeture du modal batterie
                     document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
-                    // Gérer le submit du formulaire de date
+                    // Gérer le submit du formulaire de date pour afficher le graph
                     document.getElementById('battery-date-form').addEventListener('submit', loadBatteryData);
 
+                    // Rendre visibles
                     document.getElementById('search-container').style.display = 'flex';
                     document.getElementById('toggle-controls').style.display = 'flex';
                     document.getElementById('toggle-depot').style.display = 'flex';
                     document.getElementById('map-switch-container').style.display = 'flex';
                 })
-                .catch(error => {
-                    console.error('Erreur lors du chargement des définitions de beacons:', error);
-                    alert('Une erreur est survenue lors du chargement des définitions de beacons.');
+                .catch(err => {
+                    console.error("Erreur beacons:", err);
+                    alert("Erreur lors du chargement des beacons.");
                 });
         }
 
         // Gestion du formulaire de connexion
         document.getElementById('credentials-form').addEventListener('submit', (event) => {
             event.preventDefault();
-            
             const mapboxKeyInput = document.getElementById('mapbox-key').value.trim();
             const traccarUsername = document.getElementById('traccar-username').value.trim();
             const traccarPassword = document.getElementById('traccar-password').value.trim();
 
             if (!mapboxKeyInput || !traccarUsername || !traccarPassword) {
-                alert('Veuillez remplir tous les champs.');
+                alert("Veuillez remplir tous les champs.");
                 return;
             }
-
             MAPBOX_API_KEY = mapboxKeyInput;
             TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
 
@@ -1671,7 +1635,6 @@
             initializeMap();
         });
 
-        // Fonction pour arrêter la mise à jour périodique si nécessaire
         function stopUpdatingPositions() {
             if (updateIntervalId) {
                 clearInterval(updateIntervalId);
@@ -1679,7 +1642,6 @@
             }
         }
 
-        // Nettoyer l'intervalle lorsque la page est déchargée
         window.addEventListener('beforeunload', () => {
             stopUpdatingPositions();
         });
