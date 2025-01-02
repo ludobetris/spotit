@@ -1072,17 +1072,16 @@
                 if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
 
                 let el;
-                // Corriger la taille des pickups : même taille que la chargeuse (70x70) mais sans déformation
                 if (t.group.toLowerCase() === 'pickups') {
                     el = document.createElement('img');
                     el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                    el.style.width = '70px';
-                    el.style.height = '70px';
+                    el.style.width = '80px';
+                    el.style.height = '35px';
                 } else if (t.group.toLowerCase() === 'chargeuse') {
                     el = document.createElement('img');
                     el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
-                    el.style.width = '70px';
-                    el.style.height = '70px';
+                    el.style.width = '90px';
+                    el.style.height = '90px';
                 } else {
                     el = document.createElement('div');
                     el.style.width = '20px';
