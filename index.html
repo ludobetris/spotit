@@ -347,6 +347,46 @@
             border-radius: 50%;
         }
 
+        /* --- AJOUTS pour que l'input range puisse afficher un dégradé visible --- */
+        /* On supprime l'apparence par défaut du slider (Chrome, Safari, etc.) */
+        #timeline {
+            -webkit-appearance: none; /* Nécessaire pour Chrome/Safari */
+            appearance: none;
+            background: #ccc; /* Couleur par défaut si pas de variable */
+            height: 8px;
+            border-radius: 5px;
+            outline: none;
+        }
+        /* La « piste » du slider pour Chrome/Safari */
+        #timeline::-webkit-slider-runnable-track {
+            height: 8px;
+            border-radius: 5px;
+            background: var(--timeline-gradient, #ccc);
+        }
+        #timeline::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+            margin-top: -5px; /* Aligne le thumb au centre de la piste */
+        }
+        /* La « piste » du slider pour Firefox */
+        #timeline::-moz-range-track {
+            height: 8px;
+            border-radius: 5px;
+            background: var(--timeline-gradient, #ccc);
+        }
+        #timeline::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+        }
+        /* FIN AJOUTS */
+
         /* Media Queries pour les écrans de 768px et moins */
         @media (max-width: 768px) {
             #controls-container, #depot-container {
@@ -1392,7 +1432,7 @@
             });
         }
 
-        // Créer la couleur de fond du slider timeline
+        // FONCTION pour colorer la timeline : on crée un dégradé rouge/blanc selon motion
         function createTimelineGradient(data) {
             if (!data || data.length < 2) {
                 return '#ccc'; // tout gris si pas de données
@@ -1400,20 +1440,13 @@
             let segments = [];
             const total = data.length - 1; // nombre d'intervalles
             for (let i = 0; i < total; i++) {
-                const lat1 = data[i].coordinates[1];
-                const lon1 = data[i].coordinates[0];
-                const lat2 = data[i+1].coordinates[1];
-                const lon2 = data[i+1].coordinates[0];
-                const dist = getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2);
-                
-                // Seuil "bougé" = 5m
-                const color = dist > 5 ? 'red' : 'gray';
-                
+                // Si motion = true => rouge, sinon => gris
+                const color = data[i].motion ? 'red' : '#D3D3D3';
+
                 const startPercent = (i / total) * 100;
-                const endPercent = ((i+1) / total) * 100;
+                const endPercent = ((i + 1) / total) * 100;
                 segments.push(`${color} ${startPercent}% ${endPercent}%`);
             }
-            // Ex: "linear-gradient(to right, red 0% 20%, gray 20% 100%)"
             return `linear-gradient(to right, ${segments.join(', ')})`;
         }
 
@@ -1450,11 +1483,16 @@
                     return;
                 }
                 data.sort((a, b) => new Date(a.time) - new Date(b.time));
+                
                 const coords = data.map(p => [parseFloat(p.longitude), parseFloat(p.latitude)]);
+                
+                // On stocke la motion pour colorer la timeline
                 timelineData = data.map(p => ({
                     time: new Date(p.deviceTime),
-                    coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)]
+                    coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)],
+                    motion: p.attributes?.motion === true // on récupère le booléen motion
                 }));
+
                 addRouteToMap(coords);
                 initializeTimeline();
             })
@@ -1556,8 +1594,10 @@
             timeline.value = 0;
             currentTimeDisplay.textContent = formatTime(timelineData[0].time);
 
-            // Colorer le slider (rouge si >5m, gris sinon)
-            timeline.style.background = createTimelineGradient(timelineData);
+            // Au lieu de timeline.style.background, on met le gradient en variable CSS
+            const gradient = createTimelineGradient(timelineData);
+            // On stocke le dégradé dans une variable CSS globale
+            document.documentElement.style.setProperty('--timeline-gradient', gradient);
 
             if (timelineMarker) {
                 timelineMarker.remove();
@@ -1590,7 +1630,7 @@
             timeline.value = 0;
             document.getElementById('current-time').textContent = '00:00:00';
             // Remettre le background par défaut
-            timeline.style.background = '#ccc';
+            document.documentElement.style.setProperty('--timeline-gradient', '#ccc');
         }
 
         function formatTime(date) {
