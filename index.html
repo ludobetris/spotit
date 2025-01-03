@@ -288,7 +288,59 @@
             pointer-events: none;
         }
 
-        /* Modal Styles */
+        /* Modal Overlay => plein écran */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none; /* Par défaut caché */
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        /* Contenu du modal => occupe quasi tout l'écran */
+        .modal-content {
+            background: #fff;
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #bbb;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .modal-close-btn:hover {
+            background: #999;
+        }
+        .modal-content h2,
+        .modal-content h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        #battery-modal-content canvas,
+        #engine-modal-content canvas {
+            width: 100%;
+            height: 300px;
+        }
+
+        /* Modal pour les identifiants (page de connexion) */
         #credentials-modal {
             position: fixed;
             top: 0;
@@ -348,7 +400,6 @@
         }
 
         /* --- AJOUTS pour que l'input range puisse afficher un dégradé visible --- */
-        /* On supprime l'apparence par défaut du slider (Chrome, Safari, etc.) */
         #timeline {
             -webkit-appearance: none; /* Nécessaire pour Chrome/Safari */
             appearance: none;
@@ -479,51 +530,10 @@
         #controls-content, #depot-content, #search-container {
             margin-bottom: 10px;
         }
-
-        /* Modal pour l'affichage du graphique de tension */
-        #battery-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: none; /* Par défaut, caché */
-            align-items: center;
-            justify-content: center;
-            z-index: 101;
-        }
-        #battery-modal-content {
-            background: #fff;
-            padding: 20px;
-            border-radius: 5px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 80%;
-            overflow-y: auto;
-            position: relative;
-        }
-        #battery-modal-close {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #bbb;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-        #battery-modal-close:hover {
-            background: #999;
-        }
-        #battery-chart {
-            width: 100%;
-            height: 300px;
-        }
     </style>
 </head>
 <body>
-    <!-- Modal pour saisir les identifiants -->
+    <!-- Modal pour saisir les identifiants (page de connexion) -->
     <div id="credentials-modal">
         <form id="credentials-form">
             <h2>Connexion</h2>
@@ -540,12 +550,36 @@
         </form>
     </div>
 
-    <!-- Modal pour l'affichage du graphique de tension -->
-    <div id="battery-modal">
-        <div id="battery-modal-content">
-            <button id="battery-modal-close">Fermer</button>
+    <!-- Modal pour l'affichage du graphique de tension (plein écran) -->
+    <div id="battery-modal" class="modal-overlay">
+        <div id="battery-modal-content" class="modal-content">
+            <button id="battery-modal-close" class="modal-close-btn">Fermer</button>
             <h3>Historique de tension (7 derniers jours)</h3>
             <canvas id="battery-chart"></canvas>
+        </div>
+    </div>
+
+    <!-- Modal pour l'affichage du temps moteur (plein écran) -->
+    <div id="engine-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" id="engine-modal-content">
+            <button id="engine-modal-close" class="modal-close-btn">Fermer</button>
+            <h3>Heures moteur</h3>
+            <label for="engine-start">Date/Heure début :</label>
+            <input type="datetime-local" id="engine-start">
+
+            <label for="engine-end">Date/Heure fin :</label>
+            <input type="datetime-local" id="engine-end">
+
+            <button id="engine-calc-button">Calculer</button>
+
+            <div id="engine-result" style="text-align:center; font-weight:bold; margin-bottom:20px;"></div>
+            
+            <!-- Liste des trajets ON->OFF -->
+            <div id="engine-trips-list" style="text-align:center; margin-bottom:20px;"></div>
+
+            <div style="margin-top:20px;">
+                <canvas id="engine-chart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -653,6 +687,10 @@
         let currentBatteryDeviceId = null;
         let batteryChart = null;
 
+        // Utilisé pour l'horaire moteur
+        let currentEngineDeviceId = null;
+        let engineChart = null;
+
         // --- FONCTIONS UTILITAIRES ---
 
         // Calcul de distance (Haversine)
@@ -717,6 +755,82 @@
             } else {
                 return "Tension >= 12.60V : 100% Batterie chargée.";
             }
+        }
+
+        // Calcul du temps moteur (en heures) selon si "power" est entre 13.8 et 15
+        // On parcourt les positions dans l'ordre chronologique
+        // On considère que si power de la position[i] est dans la fourchette => moteur ON
+        // On ajoute la différence de temps (en ms) entre position[i] et position[i+1] si i est ON
+        function calculateEngineHours(positions) {
+            if (!positions || positions.length < 2) return 0;
+            let totalMs = 0;
+            for (let i = 0; i < positions.length - 1; i++) {
+                const powerVal = parseFloat(positions[i].attributes?.power || 0);
+                const nextTime = new Date(positions[i+1].deviceTime).getTime();
+                const currentTime = new Date(positions[i].deviceTime).getTime();
+                if (powerVal >= 13.8 && powerVal < 15) {
+                    totalMs += (nextTime - currentTime);
+                }
+            }
+            return totalMs / (1000 * 3600); // convert ms -> heures
+        }
+
+        // Pour dessiner un graphe moteur ON/OFF (1 ou 0) dans un canvas Chart.js
+        // On renvoie un tableau de {time, on: bool}
+        function buildEngineOnOffData(positions) {
+            const result = [];
+            positions.forEach(pos => {
+                const powerVal = parseFloat(pos.attributes?.power || 0);
+                const on = (powerVal >= 13.8 && powerVal < 15) ? 1 : 0;
+                result.push({
+                    time: new Date(pos.deviceTime),
+                    on: on
+                });
+            });
+            return result;
+        }
+
+        // Parse les transitions ON->OFF pour lister les trajets
+        // On considère un "trajet" comme la période moteur ON jusqu'au OFF suivant
+        function parseEngineTrips(onOffData) {
+            let trips = [];
+            let startTime = null;
+
+            for (let i = 0; i < onOffData.length; i++) {
+                const currentState = onOffData[i].on;
+                const currentTime = onOffData[i].time;
+                const nextTime = (i < onOffData.length - 1) ? onOffData[i+1].time : currentTime;
+
+                if (currentState === 1 && startTime === null) {
+                    startTime = currentTime; // début du trajet
+                }
+                if (currentState === 0 && startTime !== null) {
+                    // fin du trajet
+                    const endTime = currentTime;
+                    let diffMs = endTime.getTime() - startTime.getTime();
+                    let hours = diffMs / 1000 / 3600;
+                    trips.push({
+                        start: startTime,
+                        end: endTime,
+                        hours: hours
+                    });
+                    startTime = null;
+                }
+
+                // Dernier point si on est encore ON
+                if (i === onOffData.length - 1 && currentState === 1 && startTime !== null) {
+                    const endTime = currentTime;
+                    let diffMs = endTime.getTime() - startTime.getTime();
+                    let hours = diffMs / 1000 / 3600;
+                    trips.push({
+                        start: startTime,
+                        end: endTime,
+                        hours: hours
+                    });
+                    startTime = null;
+                }
+            }
+            return trips;
         }
 
         // Ouvrir le modal du graphique => on déclenche le chargement automatique (7 derniers jours)
@@ -852,6 +966,158 @@
             });
         }
 
+        // --- GESTION MODAL TEMPS MOTEUR ---
+        function showEngineModal(deviceId, defaultHours = 0) {
+            currentEngineDeviceId = deviceId;
+            const modal = document.getElementById('engine-modal');
+            // Efface anciens résultats
+            document.getElementById('engine-result').textContent = `Heures moteur (journée) : ~${defaultHours.toFixed(2)} h`;
+            // Efface la liste de trajets
+            document.getElementById('engine-trips-list').innerHTML = '';
+            // Détruit le précédent graphe
+            if (engineChart) {
+                engineChart.destroy();
+                engineChart = null;
+            }
+            // Reset champs date/heure
+            document.getElementById('engine-start').value = '';
+            document.getElementById('engine-end').value = '';
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeEngineModal() {
+            const modal = document.getElementById('engine-modal');
+            modal.style.display = 'none';
+        }
+
+        // Calculer le temps moteur pour la plage indiquée, on affiche la courbe (on/off) et la liste des trajets
+        function loadEngineDataForRange() {
+            if (!currentEngineDeviceId) {
+                alert("Aucun deviceId sélectionné.");
+                return;
+            }
+            const startInput = document.getElementById('engine-start').value;
+            const endInput = document.getElementById('engine-end').value;
+            if (!startInput || !endInput) {
+                alert("Merci de renseigner la date/heure début et fin.");
+                return;
+            }
+
+            const fromISO = new Date(startInput).toISOString();
+            const toISO = new Date(endInput).toISOString();
+
+            fetch(`https://demo2.traccar.org/api/positions?deviceId=${currentEngineDeviceId}&from=${fromISO}&to=${toISO}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + TRACCAR_AUTH,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Réponse du serveur incorrecte: " + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data || !data.length) {
+                    alert("Aucune donnée dans cet intervalle.");
+                    return;
+                }
+                data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
+                const hours = calculateEngineHours(data);
+                const resultDiv = document.getElementById('engine-result');
+                resultDiv.textContent = `Heures moteur (plage sélectionnée) : ~${hours.toFixed(2)} h`;
+
+                // Construire la série ON/OFF
+                const onOffData = buildEngineOnOffData(data);
+
+                // Parse les trips ON->OFF
+                const trips = parseEngineTrips(onOffData);
+
+                // Afficher la liste des trajets
+                const tripsListDiv = document.getElementById('engine-trips-list');
+                tripsListDiv.innerHTML = '';
+                if (trips.length === 0) {
+                    tripsListDiv.textContent = 'Aucun trajet moteur ON->OFF trouvé.';
+                } else {
+                    let html = '<strong>Liste des trajets :</strong><br/>';
+                    html += '<ul style="list-style:none; padding:0;">';
+                    trips.forEach(t => {
+                        const startStr = t.start.toLocaleString();
+                        const endStr = t.end.toLocaleString();
+                        html += `<li style="margin-bottom:5px;">
+                            <b>Début :</b> ${startStr} <br/>
+                            <b>Fin :</b> ${endStr} <br/>
+                            <b>Heures :</b> ${t.hours.toFixed(2)}
+                        </li>`;
+                    });
+                    html += '</ul>';
+                    tripsListDiv.innerHTML = html;
+                }
+
+                // Mettre à jour le graphe
+                const labels = onOffData.map(d => d.time);
+                const onOffValues = onOffData.map(d => d.on);
+
+                const ctx = document.getElementById('engine-chart').getContext('2d');
+                if (engineChart) {
+                    engineChart.destroy();
+                }
+                engineChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Moteur (1=ON, 0=OFF)',
+                            data: onOffValues,
+                            borderColor: 'red',
+                            fill: false,
+                            stepped: true  // pour avoir un effet "ON/OFF" en paliers
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    tooltipFormat: 'YYYY-MM-DD HH:mm:ss',
+                                    displayFormats: {
+                                        hour: 'YYYY-MM-DD HH:mm'
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Heure'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Etat moteur'
+                                },
+                                ticks: {
+                                    stepSize: 1,
+                                    callback: function(value) {
+                                        return value === 1 ? 'ON' : 'OFF';
+                                    }
+                                },
+                                min: 0,
+                                max: 1
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erreur lors de la récupération des données moteur: " + err.message);
+            });
+        }
+
         // --- FONCTIONS PRINCIPALES ---
         async function getTrackersData() {
             try {
@@ -887,7 +1153,8 @@
 
                 const now = new Date();
                 const dateTo = now.toISOString();
-                const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString(); // 24h en arrière
+                // 24h en arrière (pour avoir la moyenne tension, etc.)
+                const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString(); 
                 const finalDevices = [];
 
                 for (const dev of devicesData) {
@@ -914,7 +1181,8 @@
                             latitude: null,
                             longitude: null,
                             hasPositions: false,
-                            avgVoltage: null
+                            avgVoltage: null,
+                            engineHoursToday: 0
                         });
                         continue;
                     }
@@ -923,6 +1191,7 @@
                     const lat = parseFloat(lastPos.latitude);
                     const lon = parseFloat(lastPos.longitude);
 
+                    // On cherche quelques "powers" pour moyenne tension
                     let powers = [];
                     for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
                         let pVal = positionsData[i].attributes?.power;
@@ -941,6 +1210,9 @@
                         avgV = Math.round(avgV * 100) / 100; 
                     }
 
+                    // Calcul h moteur de la "journée" (sur les 24 dernières h)
+                    const engineHoursToday = calculateEngineHours(positionsData);
+
                     finalDevices.push({
                         deviceId: dev.id,
                         name: dev.name || `Tracker ${dev.id}`,
@@ -948,7 +1220,8 @@
                         latitude: lat,
                         longitude: lon,
                         hasPositions: true,
-                        avgVoltage: avgV
+                        avgVoltage: avgV,
+                        engineHoursToday: engineHoursToday
                     });
                 }
 
@@ -1178,6 +1451,17 @@
                                title="${explanation}"
                                style="color:blue; text-decoration:underline;">
                                 ${t.avgVoltage} V
+                            </a>`;
+                    }
+
+                    // Ajout de la ligne heures moteur: clickable
+                    // => on ouvre un modal pour sélectionner la plage
+                    // => on affiche la valeur calculée du jour en direct (engineHoursToday)
+                    if (t.engineHoursToday !== undefined) {
+                        popupHTML += `<br/><strong>h moteur:</strong>
+                            <a href="#" style="color:blue; text-decoration:underline;"
+                               onclick="showEngineModal(${t.deviceId}, ${t.engineHoursToday}); return false;">
+                                ${t.engineHoursToday.toFixed(2)} h
                             </a>`;
                     }
 
@@ -1596,7 +1880,6 @@
 
             // Au lieu de timeline.style.background, on met le gradient en variable CSS
             const gradient = createTimelineGradient(timelineData);
-            // On stocke le dégradé dans une variable CSS globale
             document.documentElement.style.setProperty('--timeline-gradient', gradient);
 
             if (timelineMarker) {
@@ -1629,7 +1912,6 @@
             const timeline = document.getElementById('timeline');
             timeline.value = 0;
             document.getElementById('current-time').textContent = '00:00:00';
-            // Remettre le background par défaut
             document.documentElement.style.setProperty('--timeline-gradient', '#ccc');
         }
 
@@ -1692,6 +1974,10 @@
 
                     // Gérer la fermeture du modal batterie
                     document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
+                    // Gérer la fermeture du modal moteur
+                    document.getElementById('engine-modal-close').addEventListener('click', closeEngineModal);
+                    // Bouton calcul moteur
+                    document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
                     
                     // Rendre visibles
                     document.getElementById('search-container').style.display = 'flex';
