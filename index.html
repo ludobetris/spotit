@@ -661,8 +661,11 @@
         // Variable pour n'afficher qu'une popup à la fois
         let currentPopup = null;
 
-        // Définir une variable pour stocker les définitions des beacons
+        // Définitions des beacons
         let beaconDefinitions = [];
+
+        // --- NOUVELLE VARIABLE GLOBALE POUR LES GEOFENCES ---
+        let geofences = [];
 
         // Coordonnées de référence pour "Rue des Etreys 38 à Grône"
         const depotCoordinates = [7.475422, 46.257917]; // [longitude, latitude]
@@ -758,9 +761,6 @@
         }
 
         // Calcul du temps moteur (en heures) selon si "power" est entre 13.8 et 15
-        // On parcourt les positions dans l'ordre chronologique
-        // On considère que si power de la position[i] est dans la fourchette => moteur ON
-        // On ajoute la différence de temps (en ms) entre position[i] et position[i+1] si i est ON
         function calculateEngineHours(positions) {
             if (!positions || positions.length < 2) return 0;
             let totalMs = 0;
@@ -775,9 +775,76 @@
             return totalMs / (1000 * 3600); // convert ms -> heures
         }
 
-        // Pour dessiner un graphe moteur ON/OFF (1 ou 0) dans un canvas Chart.js
-        // On renvoie un tableau de {time, on: bool}
-        // On ignore les valeurs powerVal=0 pour éviter des trajets parasites.
+        // ======================
+        //   GESTION GEOFENCES
+        // ======================
+
+        // Inversion lat/lon pour s'adapter aux geofences saisies en "CIRCLE (lat lon, rayon)" etc.
+        // On suppose que l'utilisateur a mis lat en premier, puis lon.
+        function isInsideGeofence(lat, lon, geofence) {
+            if (!geofence.area) return false; 
+            const area = geofence.area.trim();
+
+            if (area.startsWith("CIRCLE")) {
+                // Format possible : CIRCLE (lat lon, rayon) => On inverse en interne
+                const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
+                const match = area.match(regexCircle);
+                if (!match) return false;
+                // On interprète le 1er comme lat, 2ème comme lon
+                const circleLat = parseFloat(match[1]);
+                const circleLon = parseFloat(match[2]);
+                const radius = parseFloat(match[3]); // en mètres
+                if (isNaN(circleLat) || isNaN(circleLon) || isNaN(radius)) return false;
+
+                const dist = getDistanceFromLatLonInMeters(lat, lon, circleLat, circleLon);
+                return dist <= radius;
+            } else if (area.startsWith("POLYGON")) {
+                // Format ex: POLYGON ((lat lon, lat lon, ...))
+                const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
+                const match = area.match(regexPoly);
+                if (!match) return false;
+                const coordsStr = match[1].trim();
+                // coordsStr: "46.2 7.45, 46.21 7.47, 46.2 7.48"
+                // On inverse chaque paire pour avoir [lon, lat] en interne
+                const coordPairs = coordsStr.split(",").map(s => s.trim().split(" "));
+                let polygon = coordPairs.map(cp => [parseFloat(cp[1]), parseFloat(cp[0])]);
+
+                return pointInPolygon([lon, lat], polygon);
+            }
+            return false;
+        }
+
+        // Algorithme point in polygon (ray-casting)
+        function pointInPolygon(point, vs) {
+            // point = [lon, lat]
+            // vs = array of [lon, lat]
+            let x = point[0], y = point[1];
+            let inside = false;
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                let xi = vs[i][0], yi = vs[i][1];
+                let xj = vs[j][0], yj = vs[j][1];
+                let intersect = ((yi > y) !== (yj > y)) &&
+                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        // Renvoie le nom de la geofence ou "Aucune" si aucune correspond
+        function getGeofenceName(lat, lon, geofencesList) {
+            for (const gf of geofencesList) {
+                if (isInsideGeofence(lat, lon, gf)) {
+                    return gf.name || "SansNom";
+                }
+            }
+            return "Aucune";
+        }
+
+        // ======================
+        // FIN GESTION GEOFENCES
+        // ======================
+
+        // Pour dessiner un graphe moteur ON/OFF (1 ou 0) => on ajoute le champ geofence
         function buildEngineOnOffData(positions) {
             const result = [];
             positions.forEach(pos => {
@@ -789,58 +856,70 @@
                 }
 
                 const on = (powerVal >= 13.8 && powerVal < 15) ? 1 : 0;
+                // Ajout de la géofence
+                const lat = parseFloat(pos.latitude);
+                const lon = parseFloat(pos.longitude);
+                const gfName = getGeofenceName(lat, lon, geofences);
+
                 result.push({
                     time: new Date(pos.deviceTime),
-                    on: on
+                    on: on,
+                    geofence: gfName
                 });
             });
             return result;
         }
 
-        // Parse les transitions ON->OFF pour lister les trajets
-        // On considère un "trajet" comme la période moteur ON jusqu'au OFF suivant
+        // Séparer le trajet dès que le moteur OFF ou quand la geofence change
         function parseEngineTrips(onOffData) {
             let trips = [];
             let startTime = null;
+            let startGeofence = null;
 
             for (let i = 0; i < onOffData.length; i++) {
                 const currentState = onOffData[i].on;
                 const currentTime = onOffData[i].time;
+                const currentGeofence = onOffData[i].geofence;
+                const isLast = (i === onOffData.length - 1);
 
-                // Prochain point (ou identique si fin du tableau)
-                const nextTime = (i < onOffData.length - 1) 
-                                 ? onOffData[i+1].time 
-                                 : currentTime;
+                // Prochain point ou identique si fin
+                const nextTime = isLast ? currentTime : onOffData[i+1].time;
+                const nextGeofence = isLast ? currentGeofence : onOffData[i+1].geofence;
 
-                // si on passe en ON et qu'on n'est pas déjà dans un trajet
+                // Si on passe en ON et qu'on n'est pas déjà dans un trajet => début
                 if (currentState === 1 && startTime === null) {
-                    startTime = currentTime; // début du trajet
+                    startTime = currentTime;
+                    startGeofence = currentGeofence;
                 }
 
-                // si on passe en OFF alors qu'on était ON => fin de trajet
-                if (currentState === 0 && startTime !== null) {
-                    const endTime = currentTime;
-                    let diffMs = endTime - startTime;
-                    let hours = diffMs / 3600000; // ms -> h
-                    trips.push({
-                        start: startTime,
-                        end: endTime,
-                        hours: hours
-                    });
-                    startTime = null;
-                }
+                // Vérifier si geofence change ou moteur passe OFF => on cloture le trajet
+                if (startTime !== null) {
+                    const geofenceChanged = (currentGeofence !== startGeofence);
+                    const engineOff = (currentState === 0);
 
-                // Dernier point si on est encore ON
-                if (i === onOffData.length - 1 && currentState === 1 && startTime !== null) {
-                    const endTime = currentTime;
-                    let diffMs = endTime - startTime;
-                    let hours = diffMs / 3600000;
-                    trips.push({
-                        start: startTime,
-                        end: endTime,
-                        hours: hours
-                    });
-                    startTime = null;
+                    if (geofenceChanged || engineOff || isLast) {
+                        const endTime = engineOff ? currentTime : currentTime; 
+                        let diffMs = endTime - startTime;
+                        let hours = diffMs / 3600000;
+                        // On enregistre
+                        trips.push({
+                            start: startTime,
+                            end: endTime,
+                            hours: hours,
+                            geofence: startGeofence
+                        });
+
+                        // Si c'est un changement de geofence ET moteur ON => on redémarre un nouveau "trajet" immédiatement
+                        if (geofenceChanged && currentState === 1) {
+                            // Nouveau départ
+                            startTime = currentTime;
+                            startGeofence = currentGeofence;
+                        } else {
+                            // Sinon on arrête
+                            startTime = null;
+                            startGeofence = null;
+                        }
+                    }
                 }
             }
             return trips;
@@ -1040,10 +1119,10 @@
                 }
                 data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
 
-                // 1) Construire la série ON/OFF
+                // 1) Construire la série ON/OFF + geofence
                 const onOffData = buildEngineOnOffData(data);
 
-                // 2) Parse les trajets ON->OFF
+                // 2) Parse les trajets ON->OFF (et geofences)
                 const trips = parseEngineTrips(onOffData);
 
                 // 3) Additionner les heures de tous les trajets
@@ -1067,7 +1146,8 @@
                         html += `<li style="margin-bottom:5px;">
                             <b>Début :</b> ${startStr} <br/>
                             <b>Fin :</b> ${endStr} <br/>
-                            <b>Heures :</b> ${t.hours.toFixed(2)}
+                            <b>Heures :</b> ${t.hours.toFixed(2)} <br/>
+                            <b>Geofence :</b> ${t.geofence}
                         </li>`;
                     });
                     html += '</ul>';
@@ -1167,6 +1247,20 @@
                 groups.forEach(group => {
                     groupIdToName[group.id] = group.name;
                 });
+
+                // --- RÉCUPÉRATION DES GEOFENCES ---
+                const geofencesResp = await fetch('https://demo2.traccar.org/api/geofences', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + TRACCAR_AUTH,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (!geofencesResp.ok) {
+                    console.warn("Erreur lors de la récupération des geofences:", geofencesResp.statusText);
+                } else {
+                    geofences = await geofencesResp.json();
+                }
 
                 const now = new Date();
                 const dateTo = now.toISOString();
@@ -1789,7 +1883,7 @@
                 timelineData = data.map(p => ({
                     time: new Date(p.deviceTime),
                     coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)],
-                    motion: p.attributes?.motion === true // on récupère le booléen motion
+                    motion: p.attributes?.motion === true 
                 }));
 
                 addRouteToMap(coords);
@@ -1824,7 +1918,7 @@
                 let type = val.substring(0, idx);
                 let id = val.substring(idx+1);
                 if (type === 'tracker') {
-                    const selectedDate = routeDateInput.value; // "yyyy-mm-dd"
+                    const selectedDate = routeDateInput.value; 
                     fetchAndDisplayRoute(id, selectedDate);
                 } else {
                     alert("La fonctionnalité de route n'est pas dispo pour les beacons.");
@@ -1834,7 +1928,7 @@
             // Quand on change la date manuellement, on recharge automatiquement la route
             routeDateInput.addEventListener('change', () => {
                 const val = document.getElementById('tracker-select').value;
-                if (!val) return; // pas de tracker sélectionné => on ne fait rien
+                if (!val) return; 
                 const idx = val.indexOf('-');
                 let type = val.substring(0, idx);
                 let id = val.substring(idx+1);
