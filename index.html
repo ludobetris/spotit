@@ -210,9 +210,9 @@
             border: 1px solid #ccc;
             display: none;
             position: absolute;
-            top: 100%; /* Positionne la liste juste en dessous du champ de recherche */
-            left: 0; /* Aligne la liste avec le côté gauche du champ de recherche */
-            width: 100%; /* Assure que la liste a la même largeur que le champ */
+            top: 100%;
+            left: 0;
+            width: 100%;
             max-height: 150px;
             overflow-y: auto;
             z-index: 30;
@@ -777,10 +777,17 @@
 
         // Pour dessiner un graphe moteur ON/OFF (1 ou 0) dans un canvas Chart.js
         // On renvoie un tableau de {time, on: bool}
+        // On ignore les valeurs powerVal=0 pour éviter des trajets parasites.
         function buildEngineOnOffData(positions) {
             const result = [];
             positions.forEach(pos => {
                 const powerVal = parseFloat(pos.attributes?.power || 0);
+
+                // Ignorer complètement les lectures à 0 volt
+                if (powerVal === 0) {
+                    return;
+                }
+
                 const on = (powerVal >= 13.8 && powerVal < 15) ? 1 : 0;
                 result.push({
                     time: new Date(pos.deviceTime),
@@ -799,16 +806,22 @@
             for (let i = 0; i < onOffData.length; i++) {
                 const currentState = onOffData[i].on;
                 const currentTime = onOffData[i].time;
-                const nextTime = (i < onOffData.length - 1) ? onOffData[i+1].time : currentTime;
 
+                // Prochain point (ou identique si fin du tableau)
+                const nextTime = (i < onOffData.length - 1) 
+                                 ? onOffData[i+1].time 
+                                 : currentTime;
+
+                // si on passe en ON et qu'on n'est pas déjà dans un trajet
                 if (currentState === 1 && startTime === null) {
                     startTime = currentTime; // début du trajet
                 }
+
+                // si on passe en OFF alors qu'on était ON => fin de trajet
                 if (currentState === 0 && startTime !== null) {
-                    // fin du trajet
                     const endTime = currentTime;
-                    let diffMs = endTime.getTime() - startTime.getTime();
-                    let hours = diffMs / 1000 / 3600;
+                    let diffMs = endTime - startTime;
+                    let hours = diffMs / 3600000; // ms -> h
                     trips.push({
                         start: startTime,
                         end: endTime,
@@ -820,8 +833,8 @@
                 // Dernier point si on est encore ON
                 if (i === onOffData.length - 1 && currentState === 1 && startTime !== null) {
                     const endTime = currentTime;
-                    let diffMs = endTime.getTime() - startTime.getTime();
-                    let hours = diffMs / 1000 / 3600;
+                    let diffMs = endTime - startTime;
+                    let hours = diffMs / 3600000;
                     trips.push({
                         start: startTime,
                         end: endTime,
@@ -1026,15 +1039,19 @@
                     return;
                 }
                 data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
-                const hours = calculateEngineHours(data);
-                const resultDiv = document.getElementById('engine-result');
-                resultDiv.textContent = `Heures moteur (plage sélectionnée) : ~${hours.toFixed(2)} h`;
 
-                // Construire la série ON/OFF
+                // 1) Construire la série ON/OFF
                 const onOffData = buildEngineOnOffData(data);
 
-                // Parse les trips ON->OFF
+                // 2) Parse les trajets ON->OFF
                 const trips = parseEngineTrips(onOffData);
+
+                // 3) Additionner les heures de tous les trajets
+                let totalHours = trips.reduce((acc, t) => acc + t.hours, 0);
+
+                // Afficher la somme dans le modal
+                const resultDiv = document.getElementById('engine-result');
+                resultDiv.textContent = `Heures moteur (plage sélectionnée) : ~${totalHours.toFixed(2)} h`;
 
                 // Afficher la liste des trajets
                 const tripsListDiv = document.getElementById('engine-trips-list');
@@ -1057,7 +1074,7 @@
                     tripsListDiv.innerHTML = html;
                 }
 
-                // Mettre à jour le graphe
+                // 4) Mettre à jour le graphe (sur la plage indiquée)
                 const labels = onOffData.map(d => d.time);
                 const onOffValues = onOffData.map(d => d.on);
 
@@ -1210,7 +1227,7 @@
                         avgV = Math.round(avgV * 100) / 100; 
                     }
 
-                    // Calcul h moteur de la "journée" (sur les 24 dernières h)
+                    // Calcul h moteur de la "journée" (sur les 24 dernières h) - juste indicatif
                     const engineHoursToday = calculateEngineHours(positionsData);
 
                     finalDevices.push({
@@ -1455,8 +1472,6 @@
                     }
 
                     // Ajout de la ligne heures moteur: clickable
-                    // => on ouvre un modal pour sélectionner la plage
-                    // => on affiche la valeur calculée du jour en direct (engineHoursToday)
                     if (t.engineHoursToday !== undefined) {
                         popupHTML += `<br/><strong>h moteur:</strong>
                             <a href="#" style="color:blue; text-decoration:underline;"
