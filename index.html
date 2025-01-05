@@ -408,7 +408,6 @@
             border-radius: 5px;
             outline: none;
         }
-        /* La « piste » du slider pour Chrome/Safari */
         #timeline::-webkit-slider-runnable-track {
             height: 8px;
             border-radius: 5px;
@@ -421,9 +420,8 @@
             border-radius: 50%;
             background: #007bff;
             cursor: pointer;
-            margin-top: -5px; /* Aligne le thumb au centre de la piste */
+            margin-top: -5px; 
         }
-        /* La « piste » du slider pour Firefox */
         #timeline::-moz-range-track {
             height: 8px;
             border-radius: 5px;
@@ -436,7 +434,6 @@
             background: #007bff;
             cursor: pointer;
         }
-        /* FIN AJOUTS */
 
         /* Media Queries pour les écrans de 768px et moins */
         @media (max-width: 768px) {
@@ -521,7 +518,6 @@
             }
         }
 
-        /* Augmenter la taille des zones cliquables */
         label, button, select {
             min-height: 40px;
             padding: 10px;
@@ -531,7 +527,7 @@
             margin-bottom: 10px;
         }
 
-        /* --- AJOUTS POUR RENDRE LE TABLEAU DE TRAJETS AGREABLE --- */
+        /* Tableau de trajets */
         #engine-trips-table {
             margin: 20px auto;
             border-collapse: collapse;
@@ -559,9 +555,8 @@
         #export-engine-button:hover {
             background: #0056b3;
         }
-        /* --- FIN AJOUTS --- */
 
-        /* --- AJOUT SPÉCIAL POUR CENTRER LES CHAMPS HEURE MOTEUR ET LES EMPILER --- */
+        /* Champ heure moteur */
         #engine-modal-content .engine-controls {
             display: flex;
             flex-direction: column;
@@ -618,7 +613,6 @@
             <button id="engine-modal-close" class="modal-close-btn">Fermer</button>
             <h3>Heures moteur</h3>
 
-            <!-- On regroupe les champs + bouton dans une div pour centrage et empilement -->
             <div class="engine-controls">
                 <label for="engine-start">Début :</label>
                 <input type="datetime-local" id="engine-start">
@@ -631,9 +625,8 @@
 
             <div id="engine-result" style="text-align:center; font-weight:bold; margin-bottom:20px;"></div>
             
-            <!-- Liste/ Tableau des trajets ON->OFF -->
             <div id="engine-trips-list" style="text-align:center; margin-bottom:20px;">
-                <!-- Nous afficherons un tableau ici (engine-trips-table) -->
+                <!-- Tableau des trajets apparaîtra ici -->
             </div>
 
             <!-- Bouton pour exporter en Excel -->
@@ -673,7 +666,7 @@
         <h2>Dépôt</h2>
         <div id="depot-content">
             <ul id="depot-list">
-                <!-- Liste des trackers et beacons dans un rayon de 200m sera générée ici -->
+                <!-- Liste trackers/beacons dans un rayon de 200m -->
             </ul>
         </div>
     </div>
@@ -692,9 +685,8 @@
         <input type="checkbox" id="map-switch" title="Changer la vue de la carte">
     </div>
 
-    <!-- Timeline (avec le champ date à gauche) -->
+    <!-- Timeline -->
     <div id="timeline-container">
-        <!-- Champ de date -->
         <input type="date" id="route-date" style="max-width: 150px;">
         <input type="range" id="timeline" min="0" max="100" value="0">
         <span id="current-time">00:00:00</span>
@@ -709,13 +701,13 @@
         let TRACCAR_AUTH = '';
 
         // Variables globales pour la carte
-        let map; // Déclarer map comme variable globale
+        let map;
 
         // Variables globales pour stocker les données
-        let trackers = [];           // stockage de la dernière position
-        let devicePositionsMap = {}; // stockage des positions + tension pour tous (dernières 24h par device)
+        let trackers = [];           
+        let devicePositionsMap = {}; 
         let markers = {};
-        let groups = []; // Liste des groupes
+        let groups = [];
         let groupIdToName = {};
         let beacons = {};
         let beaconMarkers = {};
@@ -730,7 +722,7 @@
         let geofences = [];
 
         // Coordonnées de référence pour "Rue des Etreys 38 à Grône"
-        const depotCoordinates = [7.475422, 46.257917]; // [longitude, latitude]
+        const depotCoordinates = [7.475422, 46.257917]; 
 
         // Variables pour la timeline
         let routeLayerId = 'tracker-route';
@@ -755,12 +747,10 @@
         // Utilisé pour l'horaire moteur
         let currentEngineDeviceId = null;
         let engineChart = null;
-        // Variable pour stocker les "trips" pour export en excel
         let currentEngineTrips = [];
 
         // --- FONCTIONS UTILITAIRES ---
 
-        // Calcul de distance (Haversine)
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -773,7 +763,6 @@
             return R * c;
         }
 
-        // Décalage beacon en fonction du RSSI
         function getBeaconOffset(rssi, index, total) {
             const baseDistance = 0.00002; 
             let distance;
@@ -818,7 +807,6 @@
             }
         }
 
-        // --- AJOUT : Calculer la différence de temps (en minutes) et retourner un label coloré ---
         function getLastConnectionLabel(lastTimeISO) {
             if (!lastTimeISO) return '';
             const lastTime = new Date(lastTimeISO).getTime();
@@ -826,20 +814,15 @@
             const diffMs = now - lastTime; 
             const diffMin = Math.floor(diffMs / 1000 / 60);
 
-            // Différencier les couleurs
             if (diffMin <= 1) {
-                // "En ligne" en vert
                 return '<span style="color: green;">En ligne</span>';
             } else if (diffMin <= 10) {
-                // "il y a X min" en orange
                 return `<span style="color: orange;">il y a ${diffMin} min</span>`;
             } else {
-                // "il y a X min" en rouge
                 return `<span style="color: red;">il y a ${diffMin} min</span>`;
             }
         }
 
-        // Calcul du temps moteur (en heures) selon si "power" est entre 13.8 et 15
         function calculateEngineHours(positions) {
             if (!positions || positions.length < 2) return 0;
             let totalMs = 0;
@@ -851,31 +834,26 @@
                     totalMs += (nextTime - currentTime);
                 }
             }
-            return totalMs / (1000 * 3600); // convert ms -> heures
+            return totalMs / (1000 * 3600);
         }
 
-        // ======================
-        //   GESTION GEOFENCES
-        // ======================
-
+        // GESTION GEOFENCES (existant pour test inside/out)
         function isInsideGeofence(lat, lon, geofence) {
             if (!geofence.area) return false; 
             const area = geofence.area.trim();
 
             if (area.startsWith("CIRCLE")) {
-                // Format: CIRCLE (lat lon, rayon)
                 const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
                 const match = area.match(regexCircle);
                 if (!match) return false;
                 const circleLat = parseFloat(match[1]);
                 const circleLon = parseFloat(match[2]);
-                const radius = parseFloat(match[3]); // en mètres
+                const radius = parseFloat(match[3]);
                 if (isNaN(circleLat) || isNaN(circleLon) || isNaN(radius)) return false;
 
                 const dist = getDistanceFromLatLonInMeters(lat, lon, circleLat, circleLon);
                 return dist <= radius;
             } else if (area.startsWith("POLYGON")) {
-                // Format ex: POLYGON ((lat lon, lat lon, ...))
                 const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
                 const match = area.match(regexPoly);
                 if (!match) return false;
@@ -910,11 +888,121 @@
             return "Aucune";
         }
 
-        // ======================
-        // FIN GESTION GEOFENCES
-        // ======================
+        // --- AJOUT POUR AFFICHER LES GEOFENCES ---
 
-        // Pour dessiner un graphe moteur ON/OFF => on ajoute le champ geofence
+        // Fonction pour approximer un cercle (transforme un CIRCLE en Polygon GeoJSON)
+        function approximateCircle(centerLat, centerLon, radiusM, points=64) {
+            const coords = [];
+            const radLat = centerLat * Math.PI / 180;
+            const distPerDegLat = 111300; // approx
+            const distPerDegLon = 111300 * Math.cos(radLat);
+
+            for (let i = 0; i < points; i++) {
+                const angle = 2 * Math.PI * i / points;
+                const dx = radiusM * Math.cos(angle);
+                const dy = radiusM * Math.sin(angle);
+                const latOffset = dy / distPerDegLat;
+                const lonOffset = dx / distPerDegLon;
+                coords.push([centerLon + lonOffset, centerLat + latOffset]);
+            }
+            // Fermer le polygone
+            coords.push(coords[0]);
+            return coords;
+        }
+
+        // Crée une couche GeoJSON unique contenant tous les geofences
+        function displayGeofences() {
+            // Supprime la couche si déjà présente
+            if (map.getLayer('geofences-fill')) {
+                map.removeLayer('geofences-fill');
+            }
+            if (map.getLayer('geofences-outline')) {
+                map.removeLayer('geofences-outline');
+            }
+            if (map.getSource('geofences-source')) {
+                map.removeSource('geofences-source');
+            }
+
+            const features = [];
+
+            geofences.forEach(gf => {
+                if (!gf.area) return;
+                const area = gf.area.trim();
+
+                if (area.startsWith("CIRCLE")) {
+                    const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
+                    const match = area.match(regexCircle);
+                    if (match) {
+                        const lat = parseFloat(match[1]);
+                        const lon = parseFloat(match[2]);
+                        const radiusM = parseFloat(match[3]);
+                        if (!isNaN(lat) && !isNaN(lon) && !isNaN(radiusM)) {
+                            const circleCoords = approximateCircle(lat, lon, radiusM);
+                            features.push({
+                                type: 'Feature',
+                                properties: { name: gf.name },
+                                geometry: {
+                                    type: 'Polygon',
+                                    coordinates: [ circleCoords ]
+                                }
+                            });
+                        }
+                    }
+                } else if (area.startsWith("POLYGON")) {
+                    const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
+                    const match = area.match(regexPoly);
+                    if (match) {
+                        const coordsStr = match[1].trim();
+                        const coordPairs = coordsStr.split(",").map(s => s.trim().split(" "));
+                        let ring = coordPairs.map(cp => [parseFloat(cp[1]), parseFloat(cp[0])]);
+                        features.push({
+                            type: 'Feature',
+                            properties: { name: gf.name },
+                            geometry: {
+                                type: 'Polygon',
+                                coordinates: [ ring ]
+                            }
+                        });
+                    }
+                }
+            });
+
+            const geojson = {
+                type: 'FeatureCollection',
+                features: features
+            };
+
+            if (!features.length) return; // Pas de geofences => pas besoin de couche
+
+            map.addSource('geofences-source', {
+                type: 'geojson',
+                data: geojson
+            });
+
+            // Remplissage
+            map.addLayer({
+                id: 'geofences-fill',
+                type: 'fill',
+                source: 'geofences-source',
+                paint: {
+                    'fill-color': '#00FF00',
+                    'fill-opacity': 0.2
+                }
+            });
+
+            // Contour
+            map.addLayer({
+                id: 'geofences-outline',
+                type: 'line',
+                source: 'geofences-source',
+                paint: {
+                    'line-color': '#00FF00',
+                    'line-width': 2
+                }
+            });
+        }
+        // --- FIN AJOUT POUR AFFICHER LES GEOFENCES ---
+
         function buildEngineOnOffData(positions) {
             const result = [];
             positions.forEach(pos => {
@@ -936,7 +1024,6 @@
             return result;
         }
 
-        // Séparer le trajet dès que le moteur OFF ou quand la geofence change
         function parseEngineTrips(onOffData) {
             let trips = [];
             let startTime = null;
@@ -984,7 +1071,6 @@
             return trips;
         }
 
-        // Ouvrir le modal du graphique => on déclenche le chargement automatique
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
@@ -1004,16 +1090,14 @@
             }
 
             modal.style.display = 'flex';
-            loadBatteryData(); // On charge directement sur 7 jours
+            loadBatteryData();
         }
 
-        // Fermer le modal du graphique
         function closeVoltageChart() {
             const modal = document.getElementById('battery-modal');
             modal.style.display = 'none';
         }
 
-        // Charger les données de tension sur les 7 derniers jours
         function loadBatteryData() {
             if (!currentBatteryDeviceId) {
                 alert("Aucun deviceId sélectionné pour le graphique.");
@@ -1021,7 +1105,7 @@
             }
             const now = new Date();
             const toISO = now.toISOString();
-            const fromISO = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 jours en arrière
+            const fromISO = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
             fetch(`https://demo2.traccar.org/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
                 method: 'GET',
@@ -1112,13 +1196,11 @@
             });
         }
 
-        // --- GESTION MODAL TEMPS MOTEUR ---
         function showEngineModal(deviceId, defaultHours = 0) {
             currentEngineDeviceId = deviceId;
             const modal = document.getElementById('engine-modal');
             document.getElementById('engine-result').textContent = `Heures moteur (journée) : ~${defaultHours.toFixed(2)} h`;
 
-            // Réinit le tableau
             document.getElementById('engine-trips-list').innerHTML = '';
             currentEngineTrips = [];
 
@@ -1127,14 +1209,12 @@
                 engineChart = null;
             }
 
-            // --- AJOUT : on définit les valeurs par défaut de date/heure (00h00 -> maintenant) ---
             const now = new Date();
             const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
             const currentIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             const midnightIso = new Date(midnight.getTime() - midnight.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             document.getElementById('engine-start').value = midnightIso;
             document.getElementById('engine-end').value = currentIso;
-            // --- Fin ajout ---
 
             modal.style.display = 'flex';
         }
@@ -1144,7 +1224,6 @@
             modal.style.display = 'none';
         }
 
-        // Calculer le temps moteur pour la plage indiquée, on affiche la courbe (on/off) et la liste des trajets
         function loadEngineDataForRange() {
             if (!currentEngineDeviceId) {
                 alert("Aucun deviceId sélectionné.");
@@ -1180,23 +1259,17 @@
                 }
                 data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
 
-                // 1) Construire la série ON/OFF + geofence
                 const onOffData = buildEngineOnOffData(data);
-
-                // 2) Parse les trajets ON->OFF (et geofences)
                 const trips = parseEngineTrips(onOffData);
-                currentEngineTrips = trips; // Stocker pour export Excel
+                currentEngineTrips = trips;
 
-                // 3) Additionner les heures de tous les trajets
                 let totalHours = trips.reduce((acc, t) => acc + t.hours, 0);
 
                 document.getElementById('engine-result').textContent = 
                     `Heures moteur (plage sélectionnée) : ~${totalHours.toFixed(2)} h`;
 
-                // 3b) Afficher les trajets dans un tableau
                 displayEngineTripsTable(trips);
 
-                // 4) Mettre à jour le graphe (sur la plage indiquée)
                 const labels = onOffData.map(d => d.time);
                 const onOffValues = onOffData.map(d => d.on);
 
@@ -1257,7 +1330,6 @@
             });
         }
 
-        // Afficher les trajets ON->OFF dans un tableau
         function displayEngineTripsTable(trips) {
             const container = document.getElementById('engine-trips-list');
             container.innerHTML = '';
@@ -1296,7 +1368,6 @@
             container.innerHTML = tableHtml;
         }
 
-        // Exporter le tableau en "Excel" (on génère un CSV qu'on nomme .xls)
         function exportEngineDataToExcel() {
             if (!currentEngineTrips || !currentEngineTrips.length) {
                 alert("Aucune donnée à exporter.");
@@ -1409,7 +1480,6 @@
                     const lat = parseFloat(lastPos.latitude);
                     const lon = parseFloat(lastPos.longitude);
 
-                    // On cherche quelques "powers" pour moyenne tension
                     let powers = [];
                     for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
                         let pVal = positionsData[i].attributes?.power;
@@ -1425,10 +1495,9 @@
                     if (powers.length > 0) {
                         const sum = powers.reduce((acc, val) => acc + val, 0);
                         avgV = sum / powers.length;
-                        avgV = Math.round(avgV * 100) / 100; 
+                        avgV = Math.round(avgV * 100) / 100;
                     }
 
-                    // Calcul h moteur de la "journée" (24 dernières h)
                     const engineHoursToday = calculateEngineHours(positionsData);
 
                     finalDevices.push({
@@ -1503,8 +1572,8 @@
 
                 displayGroupCheckboxes();
                 populateTrackerSelect();
-                updateMap();
-                populateDepotList();
+                updateMap();          // Met à jour la carte
+                populateDepotList();  // Met à jour la liste "Dépôt"
 
             } catch (err) {
                 console.error('Erreur lors de la récupération des données trackers:', err);
@@ -1512,7 +1581,6 @@
             }
         }
 
-        // Afficher les cases à cocher des groupes
         function displayGroupCheckboxes() {
             const groupList = document.getElementById('group-list');
             groupList.innerHTML = '';
@@ -1548,7 +1616,6 @@
             });
         }
 
-        // Peupler le sélecteur de trackers et beacons
         function populateTrackerSelect() {
             const trackerSelect = document.getElementById('tracker-select');
             const currentValue = trackerSelect.value;
@@ -1615,13 +1682,11 @@
             }
         }
 
-        // Ouverture popup (on n'en ferme pas forcément l'ancien)
         function openPopup(popup) {
             currentPopup = popup;
             currentPopup.addTo(map);
         }
 
-        // Mise à jour de la carte
         function updateMap() {
             if (!map) {
                 return;
@@ -1658,9 +1723,7 @@
                         el.style.backgroundColor = 'orange';
                     }
 
-                    // Ajout dans la popup : battery + dernière connexion
                     let popupHTML = `<strong>Nom:</strong> ${t.name}`;
-
                     if (t.avgVoltage !== null) {
                         const iconUrl = getBatteryIcon(t.avgVoltage);
                         const explanation = getBatteryTooltip(t.avgVoltage);
@@ -1681,7 +1744,6 @@
                             </a>`;
                     }
 
-                    // Ajout de la dernière connexion
                     const lastConnLabel = getLastConnectionLabel(t.lastConnectionTime);
                     if (lastConnLabel) {
                         popupHTML += `<br/><strong>Dernière connexion :</strong> ${lastConnLabel}`;
@@ -1706,7 +1768,6 @@
                 }
             });
 
-            // Retirer les marqueurs trackers qui ne sont plus visibles
             Object.keys(markers).forEach(deviceId => {
                 if (!visibleTrackerIds.includes(deviceId)) {
                     markers[deviceId].remove();
@@ -1714,7 +1775,6 @@
                 }
             });
 
-            // Gérer les beacons
             const visibleBeaconIds = [];
             Object.values(beacons).forEach(b => {
                 if (!checkedGroups.includes(b.group)) return;
@@ -1755,16 +1815,17 @@
                 }
             });
 
-            // Retirer les beacons qui ne sont plus visibles
             Object.keys(beaconMarkers).forEach(bId => {
                 if (!visibleBeaconIds.includes(bId)) {
                     beaconMarkers[bId].remove();
                     delete beaconMarkers[bId];
                 }
             });
+
+            // --- AJOUT POUR AFFICHER LES GEOFENCES ---
+            displayGeofences();
         }
 
-        // Peupler la liste "Dépôt"
         function populateDepotList() {
             const depotList = document.getElementById('depot-list');
             depotList.innerHTML = '';
@@ -1813,7 +1874,6 @@
             }
         }
 
-        // Boutons basculement
         function setupToggleButtons() {
             document.getElementById('toggle-controls').addEventListener('click', () => {
                 document.getElementById('controls-container').classList.toggle('active');
@@ -1823,7 +1883,6 @@
             });
         }
 
-        // Switch vue carte
         function setupMapSwitch() {
             document.getElementById('map-switch').addEventListener('change', (event) => {
                 if (event.target.checked) {
@@ -1838,7 +1897,6 @@
             });
         }
 
-        // Suggestions d'adresse
         let searchMarker = null;
         function displaySuggestions(query) {
             fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
@@ -1934,7 +1992,6 @@
             });
         }
 
-        // FONCTION pour colorer la timeline
         function createTimelineGradient(data) {
             if (!data || data.length < 2) {
                 return '#ccc';
@@ -2130,7 +2187,6 @@
             return `${h}:${m}:${s}`;
         }
 
-        // Initialiser la carte
         function initializeMap() {
             fetch('https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json')
                 .then(r => {
@@ -2179,16 +2235,11 @@
                     setupSearch();
                     setupRouteButton();
 
-                    // Gérer la fermeture du modal batterie
                     document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
-                    // Gérer la fermeture du modal moteur
                     document.getElementById('engine-modal-close').addEventListener('click', closeEngineModal);
-                    // Bouton calcul moteur
                     document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
-                    // Bouton export Excel
                     document.getElementById('export-engine-button').addEventListener('click', exportEngineDataToExcel);
 
-                    // Rendre visibles
                     document.getElementById('search-container').style.display = 'flex';
                     document.getElementById('toggle-controls').style.display = 'flex';
                     document.getElementById('toggle-depot').style.display = 'flex';
@@ -2211,7 +2262,6 @@
             stopUpdatingPositions();
         });
 
-        // Gestion du formulaire de connexion
         document.getElementById('credentials-form').addEventListener('submit', (event) => {
             event.preventDefault();
             const mapboxKeyInput = document.getElementById('mapbox-key').value.trim();
