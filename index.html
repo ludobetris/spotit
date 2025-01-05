@@ -1426,6 +1426,13 @@
                     groupIdToName[group.id] = group.name;
                 });
 
+                // Cocher tous les groupes sauf 'Beacons' par défaut
+                groups.forEach(group => {
+                    if (group.name !== 'Beacons') {
+                        checkedGroupsSet.add(group.name);
+                    }
+                });
+
                 // --- RÉCUPÉRATION DES GEOFENCES ---
                 const geofencesResp = await fetch('https://demo2.traccar.org/api/geofences', {
                     method: 'GET',
