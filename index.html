@@ -560,6 +560,29 @@
             background: #0056b3;
         }
         /* --- FIN AJOUTS --- */
+
+        /* --- AJOUT SPÉCIAL POUR CENTRER LES CHAMPS HEURE MOTEUR ET LES EMPILER --- */
+        #engine-modal-content .engine-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        #engine-modal-content .engine-controls label {
+            display: flex;
+            align-items: flex-end;
+            margin: 0;
+            padding: 0;
+            height: 20px;
+            text-align: center;
+        }
+        #engine-modal-content .engine-controls input,
+        #engine-modal-content .engine-controls button {
+            display: block;
+            margin: 8px auto;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -594,13 +617,17 @@
         <div class="modal-content" id="engine-modal-content">
             <button id="engine-modal-close" class="modal-close-btn">Fermer</button>
             <h3>Heures moteur</h3>
-            <label for="engine-start">Date/Heure début :</label>
-            <input type="datetime-local" id="engine-start">
 
-            <label for="engine-end">Date/Heure fin :</label>
-            <input type="datetime-local" id="engine-end">
+            <!-- On regroupe les champs + bouton dans une div pour centrage et empilement -->
+            <div class="engine-controls">
+                <label for="engine-start">Début :</label>
+                <input type="datetime-local" id="engine-start">
 
-            <button id="engine-calc-button">Calculer</button>
+                <label for="engine-end">Fin :</label>
+                <input type="datetime-local" id="engine-end">
+
+                <button id="engine-calc-button">Afficher</button>
+            </div>
 
             <div id="engine-result" style="text-align:center; font-weight:bold; margin-bottom:20px;"></div>
             
@@ -1099,8 +1126,15 @@
                 engineChart.destroy();
                 engineChart = null;
             }
-            document.getElementById('engine-start').value = '';
-            document.getElementById('engine-end').value = '';
+
+            // --- AJOUT : on définit les valeurs par défaut de date/heure (00h00 -> maintenant) ---
+            const now = new Date();
+            const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            const currentIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            const midnightIso = new Date(midnight.getTime() - midnight.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            document.getElementById('engine-start').value = midnightIso;
+            document.getElementById('engine-end').value = currentIso;
+            // --- Fin ajout ---
 
             modal.style.display = 'flex';
         }
