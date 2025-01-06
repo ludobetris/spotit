@@ -1766,7 +1766,9 @@
                         .setPopup(popup);
 
                     marker.getElement().addEventListener('click', () => {
-                        openPopup(marker.getPopup());
+                        const trackerSelect = document.getElementById('tracker-select');
+                        trackerSelect.value = `tracker-${t.deviceId}`; // Sélectionne l'option correspondante
+                        trackerSelect.dispatchEvent(new Event('change')); // Déclenche l'événement 'change' pour exécuter les actions associées
                     });
                     marker.addTo(map);
                     markers[t.deviceId] = marker;
@@ -1812,7 +1814,9 @@
                         .setPopup(popup);
 
                     marker.getElement().addEventListener('click', () => {
-                        openPopup(marker.getPopup());
+                        const trackerSelect = document.getElementById('tracker-select');
+                        trackerSelect.value = `beacon-${b.id}`; // Sélectionne l'option correspondante
+                        trackerSelect.dispatchEvent(new Event('change')); // Déclenche l'événement 'change'
                     });
 
                     marker.addTo(map);
