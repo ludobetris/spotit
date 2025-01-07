@@ -1534,7 +1534,7 @@
 
                 beacons = {};
                 currentPositionsData.forEach(position => {
-                    for (let i = 1; i <= 4; i++) {
+                    for (let i = 1; i <= 20; i++) {
                         const namespaceKey = `beacon${i}Namespace`;
                         const instanceKey = `beacon${i}Instance`;
                         const rssiKey = `beacon${i}Rssi`;
@@ -1545,7 +1545,7 @@
                             const beaconId = `${namespaceId}-${instanceId}`;
 
                             const rssi = position.attributes[rssiKey];
-                            const { offsetLng, offsetLat } = getBeaconOffset(rssi, i, 4);
+                            const { offsetLng, offsetLat } = getBeaconOffset(rssi, i, 20);
 
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
