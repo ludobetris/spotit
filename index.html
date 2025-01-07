@@ -1454,7 +1454,7 @@
 
                 for (const dev of devicesData) {
                     const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
-                    const positionsUrl = `hhttps://xf5655945.traccar.com/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
+                    const positionsUrl = `https://xf5655945.traccar.com/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
                     
                     const positionsResp = await fetch(positionsUrl, {
                         method: 'GET',
