@@ -795,34 +795,91 @@
             return { offsetLng, offsetLat };
         }
 
+        /**
+         * Renvoie l'URL de l'icône batterie en tenant compte 
+         * de la tension 12V ou 24V.
+         */
         function getBatteryIcon(voltage) {
-            if (voltage < 10.5) {
-                return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
-            } else if (voltage < 12.0) {
-                return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv1.png";
-            } else if (voltage < 12.35) {
-                return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv2.png";
-            } else if (voltage < 12.6) {
-                return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv3.png";
+            // --- LOGIQUE 12V ---
+            // <10.5 => lv0
+            // <12.0 => lv1
+            // <12.35 => lv2
+            // <12.6 => lv3
+            // >=12.6 => lv4
+
+            // --- LOGIQUE 24V ---
+            // <20 => lv0
+            // <24 => lv1
+            // <25.2 => lv2
+            // <26.4 => lv3
+            // >=26.4 => lv4
+
+            if (voltage < 18) {
+                // Cas 12V
+                if (voltage < 10.5) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
+                } else if (voltage < 12.0) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv1.png";
+                } else if (voltage < 12.35) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv2.png";
+                } else if (voltage < 12.6) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv3.png";
+                } else {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv4.png";
+                }
             } else {
-                return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv4.png";
+                // Cas 24V
+                if (voltage < 20) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
+                } else if (voltage < 24) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv1.png";
+                } else if (voltage < 25.2) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv2.png";
+                } else if (voltage < 26.4) {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv3.png";
+                } else {
+                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv4.png";
+                }
             }
         }
 
+        /**
+         * Renvoie un message texte adapté à l'état de la batterie, 
+         * selon qu'on est en 12V ou 24V.
+         */
         function getBatteryTooltip(voltage) {
-            if (voltage < 10.5) {
-                return "Tension <10.5V : Batterie HS (soudure coupée ou décharge profonde).";
-            } else if (voltage < 12.0) {
-                return "Tension ~12.0V : Batterie endommagée, décharge profonde. À recharger + test d'effort.";
-            } else if (voltage < 12.35) {
-                return "Tension ~12.2V : Entre 12.0 et 12.35 => 25-50% de charge, attention à l'endommagement.";
-            } else if (voltage < 12.6) {
-                return "Tension ~12.35-12.59V : Batterie entre 50% et 99%. En dessous de 12.35V, elle s'endommage à long terme.";
+            if (voltage < 18) {
+                // Cas 12V
+                if (voltage < 10.5) {
+                    return "Tension <10.5V : Batterie HS (soudure coupée ou décharge profonde).";
+                } else if (voltage < 12.0) {
+                    return "Tension ~12.0V : Batterie endommagée, décharge profonde. À recharger + test d'effort.";
+                } else if (voltage < 12.35) {
+                    return "Tension ~12.2V : Entre 12.0 et 12.35 => 25-50% de charge, attention à l'endommagement.";
+                } else if (voltage < 12.6) {
+                    return "Tension ~12.35-12.59V : 50-99%. En dessous de 12.35V, elle s'endommage à long terme.";
+                } else {
+                    return "Tension >= 12.60V : 100% Batterie chargée.";
+                }
             } else {
-                return "Tension >= 12.60V : 100% Batterie chargée.";
+                // Cas 24V
+                if (voltage < 20) {
+                    return "Tension <20V : Batterie HS ou très basse (24V).";
+                } else if (voltage < 24) {
+                    return "Tension entre 20V et 24V : Endommagée, à recharger + test d'effort.";
+                } else if (voltage < 25.2) {
+                    return "Tension entre 24V et 25.2V : 25-50% de charge.";
+                } else if (voltage < 26.4) {
+                    return "Tension entre 25.2V et 26.4V : 50-99%.";
+                } else {
+                    return "Tension >= 26.4V : 100% Batterie chargée (24V).";
+                }
             }
         }
 
+        /**
+         * Renvoie un label sur la dernière connexion (vert/orange/rouge).
+         */
         function getLastConnectionLabel(lastTimeISO) {
             if (!lastTimeISO) return '';
             const lastTime = new Date(lastTimeISO).getTime();
@@ -839,6 +896,10 @@
             }
         }
 
+        /**
+         * Calcule le total d'heures moteur, 
+         * selon qu'on est en 12V ou 24V (conditions).
+         */
         function calculateEngineHours(positions) {
             if (!positions || positions.length < 2) return 0;
             let totalMs = 0;
@@ -846,8 +907,18 @@
                 const powerVal = parseFloat(positions[i].attributes?.power || 0);
                 const nextTime = new Date(positions[i+1].deviceTime).getTime();
                 const currentTime = new Date(positions[i].deviceTime).getTime();
-                if (powerVal >= 13.8 && powerVal < 15) {
-                    totalMs += (nextTime - currentTime);
+
+                if (powerVal < 18) {
+                    // Logique 12V
+                    if (powerVal >= 13.8 && powerVal < 15) {
+                        totalMs += (nextTime - currentTime);
+                    }
+                } else {
+                    // Logique 24V
+                    // Moteur ON si powerVal >= 27.2
+                    if (powerVal >= 27.2) {
+                        totalMs += (nextTime - currentTime);
+                    }
                 }
             }
             return totalMs / (1000 * 3600);
@@ -1012,6 +1083,10 @@
         }
         // --- FIN AJOUT POUR AFFICHER LES GEOFENCES ---
 
+        /**
+         * Bâtit un tableau (time, on/off, geofence) 
+         * en tenant compte de la différence 12V / 24V.
+         */
         function buildEngineOnOffData(positions) {
             const result = [];
             positions.forEach(pos => {
@@ -1019,7 +1094,15 @@
                 if (powerVal === 0) {
                     return;
                 }
-                const on = (powerVal >= 13.8 && powerVal < 15) ? 1 : 0;
+                let on = 0;
+                if (powerVal < 18) {
+                    // 12V => ON si >=13.8 && <15
+                    on = (powerVal >= 13.8 && powerVal < 15) ? 1 : 0;
+                } else {
+                    // 24V => ON si >=27.2
+                    on = (powerVal >= 27.2) ? 1 : 0;
+                }
+
                 const lat = parseFloat(pos.latitude);
                 const lon = parseFloat(pos.longitude);
                 const gfName = getGeofenceName(lat, lon, geofences);
@@ -1033,6 +1116,10 @@
             return result;
         }
 
+        /**
+         * Découpe le tableau ON/OFF en « trips » (démarrage => arrêt) 
+         * en prenant en compte la géofence de départ.
+         */
         function parseEngineTrips(onOffData) {
             let trips = [];
             let startTime = null;
@@ -1194,6 +1281,7 @@
                         plugins: {
                             annotation: {
                                 annotations: {
+                                    // Lignes pour 12V
                                     line105: {
                                         type: 'line',
                                         yMin: 10.5,
@@ -1239,6 +1327,55 @@
                                         label: {
                                             enabled: true,
                                             content: '12.6V (100%)',
+                                            position: 'end'
+                                        }
+                                    },
+                                    // Lignes pour 24V
+                                    line200: {
+                                        type: 'line',
+                                        yMin: 20.0,
+                                        yMax: 20.0,
+                                        borderColor: 'red',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '20V (HS-24V)',
+                                            position: 'end'
+                                        }
+                                    },
+                                    line240: {
+                                        type: 'line',
+                                        yMin: 24.0,
+                                        yMax: 24.0,
+                                        borderColor: 'orange',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '24V',
+                                            position: 'end'
+                                        }
+                                    },
+                                    line252: {
+                                        type: 'line',
+                                        yMin: 25.2,
+                                        yMax: 25.2,
+                                        borderColor: 'yellow',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '25.2V',
+                                            position: 'end'
+                                        }
+                                    },
+                                    line264: {
+                                        type: 'line',
+                                        yMin: 26.4,
+                                        yMax: 26.4,
+                                        borderColor: 'green',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '26.4V (100%)',
                                             position: 'end'
                                         }
                                     }
@@ -1588,6 +1725,7 @@
                         avgV = Math.round(avgV * 100) / 100;
                     }
 
+                    // Calcul heures moteur sur la dernière journée
                     const engineHoursToday = calculateEngineHours(positionsData);
 
                     finalDevices.push({
