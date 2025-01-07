@@ -1107,7 +1107,7 @@
             const toISO = now.toISOString();
             const fromISO = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-            fetch(`https://demo2.traccar.org/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
+            fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': 'Basic ' + TRACCAR_AUTH,
@@ -1239,7 +1239,7 @@
             const fromISO = new Date(startInput).toISOString();
             const toISO = new Date(endInput).toISOString();
 
-            fetch(`https://demo2.traccar.org/api/positions?deviceId=${currentEngineDeviceId}&from=${fromISO}&to=${toISO}`, {
+            fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${currentEngineDeviceId}&from=${fromISO}&to=${toISO}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': 'Basic ' + TRACCAR_AUTH,
@@ -1397,7 +1397,7 @@
         async function getTrackersData() {
             try {
                 // 1) Récupération liste des devices
-                const devicesResponse = await fetch('https://demo2.traccar.org/api/devices', {
+                const devicesResponse = await fetch('https://xf5655945.traccar.com/api/devices', {
                     method: 'GET',
                     headers: {
                         'Authorization': 'Basic ' + TRACCAR_AUTH,
@@ -1410,7 +1410,7 @@
                 const devicesData = await devicesResponse.json();
 
                 // 2) Récupération de la liste des groupes
-                const groupsResponse = await fetch('https://demo2.traccar.org/api/groups', {
+                const groupsResponse = await fetch('https://xf5655945.traccar.com/api/groups', {
                     method: 'GET',
                     headers: {
                         'Authorization': 'Basic ' + TRACCAR_AUTH,
@@ -1434,7 +1434,7 @@
                 });
 
                 // --- RÉCUPÉRATION DES GEOFENCES ---
-                const geofencesResp = await fetch('https://demo2.traccar.org/api/geofences', {
+                const geofencesResp = await fetch('https://xf5655945.traccar.com/api/geofences', {
                     method: 'GET',
                     headers: {
                         'Authorization': 'Basic ' + TRACCAR_AUTH,
@@ -1454,7 +1454,7 @@
 
                 for (const dev of devicesData) {
                     const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
-                    const positionsUrl = `https://demo2.traccar.org/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
+                    const positionsUrl = `hhttps://xf5655945.traccar.com/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
                     
                     const positionsResp = await fetch(positionsUrl, {
                         method: 'GET',
@@ -1523,7 +1523,7 @@
                 trackers = finalDevices;
 
                 // 3) Beacons
-                const currentPositionsResp = await fetch('https://demo2.traccar.org/api/positions', {
+                const currentPositionsResp = await fetch('https://xf5655945.traccar.com/api/positions', {
                     method: 'GET',
                     headers: {
                         'Authorization': 'Basic ' + TRACCAR_AUTH,
