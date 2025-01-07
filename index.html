@@ -2033,7 +2033,7 @@
             const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).toISOString();
             const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1).toISOString();
 
-            fetch(`https://demo2.traccar.org/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
+            fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
                 headers: {
                     'Authorization': 'Basic ' + TRACCAR_AUTH,
                     'Content-Type': 'application/json'
