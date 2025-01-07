@@ -10,6 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
+    <!-- AJOUT DU PLUGIN POUR LES LIGNES D’ANNOTATION -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 
     <style>
         body, html {
@@ -602,7 +604,21 @@
     <div id="battery-modal" class="modal-overlay">
         <div id="battery-modal-content" class="modal-content">
             <button id="battery-modal-close" class="modal-close-btn">Fermer</button>
-            <h3>Historique de tension (7 derniers jours)</h3>
+            <!-- On renomme le titre pour refléter la plage personnalisée -->
+            <h3>Historique de tension</h3>
+
+            <!-- AJOUTS POUR LES DATES BATTERIE -->
+            <div class="engine-controls">
+                <label for="battery-start">Début :</label>
+                <input type="datetime-local" id="battery-start">
+
+                <label for="battery-end">Fin :</label>
+                <input type="datetime-local" id="battery-end">
+
+                <button id="battery-calc-button">Afficher</button>
+            </div>
+            <!-- FIN AJOUTS POUR LES DATES BATTERIE -->
+
             <canvas id="battery-chart"></canvas>
         </div>
     </div>
@@ -837,7 +853,7 @@
             return totalMs / (1000 * 3600);
         }
 
-        // GESTION GEOFENCES (existant pour test inside/out)
+        // GESTION GEOFENCES
         function isInsideGeofence(lat, lon, geofence) {
             if (!geofence.area) return false; 
             const area = geofence.area.trim();
@@ -889,8 +905,6 @@
         }
 
         // --- AJOUT POUR AFFICHER LES GEOFENCES ---
-
-        // Fonction pour approximer un cercle (transforme un CIRCLE en Polygon GeoJSON)
         function approximateCircle(centerLat, centerLon, radiusM, points=64) {
             const coords = [];
             const radLat = centerLat * Math.PI / 180;
@@ -905,14 +919,11 @@
                 const lonOffset = dx / distPerDegLon;
                 coords.push([centerLon + lonOffset, centerLat + latOffset]);
             }
-            // Fermer le polygone
             coords.push(coords[0]);
             return coords;
         }
 
-        // Crée une couche GeoJSON unique contenant tous les geofences
         function displayGeofences() {
-            // Supprime la couche si déjà présente
             if (map.getLayer('geofences-fill')) {
                 map.removeLayer('geofences-fill');
             }
@@ -972,14 +983,13 @@
                 features: features
             };
 
-            if (!features.length) return; // Pas de geofences => pas besoin de couche
+            if (!features.length) return;
 
             map.addSource('geofences-source', {
                 type: 'geojson',
                 data: geojson
             });
 
-            // Remplissage
             map.addLayer({
                 id: 'geofences-fill',
                 type: 'fill',
@@ -990,7 +1000,6 @@
                 }
             });
 
-            // Contour
             map.addLayer({
                 id: 'geofences-outline',
                 type: 'line',
@@ -1071,6 +1080,7 @@
             return trips;
         }
 
+        // --- CHANGEMENTS POUR RENDRE LE GRAPHIQUE BATTERIE PERSONNALISÉ ---
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
@@ -1078,6 +1088,14 @@
             const batteryModalContent = document.getElementById('battery-modal-content');
             const oldLoading = document.getElementById('battery-loading-text');
             if (oldLoading) oldLoading.remove();
+
+            // On met la période par défaut : de minuit à maintenant
+            const batteryNow = new Date();
+            const batteryMidnight = new Date(batteryNow.getFullYear(), batteryNow.getMonth(), batteryNow.getDate(), 0, 0, 0);
+            const batteryCurrentIso = new Date(batteryNow.getTime() - batteryNow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            const batteryMidnightIso = new Date(batteryMidnight.getTime() - batteryMidnight.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            document.getElementById('battery-start').value = batteryMidnightIso;
+            document.getElementById('battery-end').value = batteryCurrentIso;
 
             let loadingText = document.createElement('p');
             loadingText.id = 'battery-loading-text';
@@ -1090,7 +1108,9 @@
             }
 
             modal.style.display = 'flex';
-            loadBatteryData();
+
+            // On charge automatiquement les données pour la plage "aujourd'hui"
+            loadBatteryDataForRange();
         }
 
         function closeVoltageChart() {
@@ -1098,14 +1118,21 @@
             modal.style.display = 'none';
         }
 
-        function loadBatteryData() {
+        // Nouvelle fonction qui utilise la plage personnalisée sélectionnée
+        function loadBatteryDataForRange() {
             if (!currentBatteryDeviceId) {
                 alert("Aucun deviceId sélectionné pour le graphique.");
                 return;
             }
-            const now = new Date();
-            const toISO = now.toISOString();
-            const fromISO = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const startInput = document.getElementById('battery-start').value;
+            const endInput = document.getElementById('battery-end').value;
+            if (!startInput || !endInput) {
+                alert("Merci de renseigner la date/heure début et fin.");
+                return;
+            }
+
+            const fromISO = new Date(startInput).toISOString();
+            const toISO = new Date(endInput).toISOString();
 
             fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
                 method: 'GET',
@@ -1125,7 +1152,7 @@
                 if (loadTxt) loadTxt.remove();
 
                 if (!data || !data.length) {
-                    alert("Aucune donnée de tension trouvée sur cette période (7 jours).");
+                    alert("Aucune donnée de tension trouvée dans cette plage.");
                     return;
                 }
                 const labels = [];
@@ -1142,7 +1169,7 @@
                     }
                 });
                 if (powers.length === 0) {
-                    alert("Aucune donnée de tension (champ 'power') n'a été trouvée sur cette période.");
+                    alert("Aucune donnée de tension (champ 'power') dans cette plage.");
                     return;
                 }
                 const ctx = document.getElementById('battery-chart').getContext('2d');
@@ -1163,6 +1190,61 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        // Ajout des lignes d’annotation pour repères de tension
+                        plugins: {
+                            annotation: {
+                                annotations: {
+                                    line105: {
+                                        type: 'line',
+                                        yMin: 10.5,
+                                        yMax: 10.5,
+                                        borderColor: 'red',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '10.5V (HS)',
+                                            position: 'end'
+                                        }
+                                    },
+                                    line120: {
+                                        type: 'line',
+                                        yMin: 12.0,
+                                        yMax: 12.0,
+                                        borderColor: 'orange',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '12.0V',
+                                            position: 'end'
+                                        }
+                                    },
+                                    line1235: {
+                                        type: 'line',
+                                        yMin: 12.35,
+                                        yMax: 12.35,
+                                        borderColor: 'yellow',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '12.35V',
+                                            position: 'end'
+                                        }
+                                    },
+                                    line126: {
+                                        type: 'line',
+                                        yMin: 12.6,
+                                        yMax: 12.6,
+                                        borderColor: 'green',
+                                        borderWidth: 1,
+                                        label: {
+                                            enabled: true,
+                                            content: '12.6V (100%)',
+                                            position: 'end'
+                                        }
+                                    }
+                                }
+                            }
+                        },
                         scales: {
                             x: {
                                 type: 'time',
@@ -1195,6 +1277,7 @@
                 alert("Erreur lors de la récupération des données de tension: " + err.message);
             });
         }
+        // --- FIN CHANGEMENTS BATTERIE PERSONNALISÉE ---
 
         function showEngineModal(deviceId, defaultHours = 0) {
             currentEngineDeviceId = deviceId;
@@ -1767,8 +1850,8 @@
 
                     marker.getElement().addEventListener('click', () => {
                         const trackerSelect = document.getElementById('tracker-select');
-                        trackerSelect.value = `tracker-${t.deviceId}`; // Sélectionne l'option correspondante
-                        trackerSelect.dispatchEvent(new Event('change')); // Déclenche l'événement 'change' pour exécuter les actions associées
+                        trackerSelect.value = `tracker-${t.deviceId}`;
+                        trackerSelect.dispatchEvent(new Event('change'));
                     });
                     marker.addTo(map);
                     markers[t.deviceId] = marker;
@@ -1815,8 +1898,8 @@
 
                     marker.getElement().addEventListener('click', () => {
                         const trackerSelect = document.getElementById('tracker-select');
-                        trackerSelect.value = `beacon-${b.id}`; // Sélectionne l'option correspondante
-                        trackerSelect.dispatchEvent(new Event('change')); // Déclenche l'événement 'change'
+                        trackerSelect.value = `beacon-${b.id}`;
+                        trackerSelect.dispatchEvent(new Event('change'));
                     });
 
                     marker.addTo(map);
@@ -2246,11 +2329,18 @@
                     setupSearch();
                     setupRouteButton();
 
+                    // Boutons de fermeture modals
                     document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
                     document.getElementById('engine-modal-close').addEventListener('click', closeEngineModal);
+
+                    // Boutons de calcul / export
                     document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
                     document.getElementById('export-engine-button').addEventListener('click', exportEngineDataToExcel);
 
+                    // Bouton pour recharger la plage batterie
+                    document.getElementById('battery-calc-button').addEventListener('click', loadBatteryDataForRange);
+
+                    // On rend visible les éléments cachés
                     document.getElementById('search-container').style.display = 'flex';
                     document.getElementById('toggle-controls').style.display = 'flex';
                     document.getElementById('toggle-depot').style.display = 'flex';
