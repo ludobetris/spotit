@@ -765,7 +765,124 @@
         let engineChart = null;
         let currentEngineTrips = [];
 
-        // --- FONCTIONS UTILITAIRES ---
+        // ----------------------------------------------------
+        //       AJOUTS POUR GÉRER JOUR/NUIT ET 3D
+        // ----------------------------------------------------
+        
+        // Approximation du lever/coucher de soleil pour la Suisse
+        // On utilise une latitude/longitude centrale ~ (46.8, 8.3)
+        // + formules basées sur la trigonométrie solaire simplifiée
+        function approximateSunTimes(date = new Date()) {
+            // Coordonnées "moyennes" Suisse
+            const lat = 46.8;
+            const lng = 8.3;
+            // Jour julien
+            const dayOfYear = Math.floor(
+                (date - new Date(date.getFullYear(), 0, 0)) / 86400000
+            );
+            // Approx. (pas hyper précis, mais mieux qu'un if hour>=19)
+            // https://en.wikipedia.org/wiki/Sunrise_equation (simplifié)
+            const declin = -23.44 * Math.cos(((2 * Math.PI) / 365) * (dayOfYear + 10));
+            const radLat = (Math.PI / 180) * lat;
+            const radDecl = (Math.PI / 180) * declin;
+            // angle de l'heure sunrise/sunset
+            const ha = Math.acos(
+                (Math.sin(-0.83 * Math.PI / 180) - Math.sin(radLat) * Math.sin(radDecl)) /
+                (Math.cos(radLat) * Math.cos(radDecl))
+            );
+            // fraction du jour => sunrise
+            const dayLength = (2 * ha / (2 * Math.PI)) * 24; // en heures
+            const solarNoon = 12 + (lng / 15); // approx
+            const sunrise = solarNoon - dayLength / 2;
+            const sunset = solarNoon + dayLength / 2;
+            return { sunrise, sunset };
+        }
+
+        /**
+         * Renvoie la string du style "day streets", "night dark" etc.
+         * en fonction de si le switch Satellite est coché ou non.
+         */
+        function getCurrentMapStyle() {
+            const { sunrise, sunset } = approximateSunTimes();
+            const now = new Date();
+            const hour = now.getHours() + now.getMinutes() / 60;
+            const isDay = (hour >= sunrise && hour < sunset);
+
+            const isSatelliteChecked = document.getElementById('map-switch').checked;
+
+            if (isDay) {
+                // Jour
+                return isSatelliteChecked
+                    ? 'mapbox://styles/mapbox/satellite-streets-v11'
+                    : 'mapbox://styles/mapbox/streets-v11';
+            } else {
+                // Nuit
+                // Il n'y a pas de "satellite dark" officiel, 
+                // donc on reste sur satellite-streets v11 la nuit aussi si coché,
+                // sinon dark-v10.
+                return isSatelliteChecked
+                    ? 'mapbox://styles/mapbox/satellite-streets-v11'
+                    : 'mapbox://styles/mapbox/dark-v10';
+            }
+        }
+
+        /**
+         * Ajoute la couche 3D (terrain + bâtiments extrudés) 
+         * après le chargement du style.
+         */
+        function add3DFeatures() {
+            // Ajout terrain (DEM)
+            if (!map.getSource('mapbox-dem')) {
+                map.addSource('mapbox-dem', {
+                    "type": "raster-dem",
+                    "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+                    "tileSize": 512,
+                    "maxzoom": 14
+                });
+            }
+            map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.2 });
+
+            // Ajout des bâtiments extrudés
+            // Note: 'composite' est la source standard Mapbox (streets ou satellite-streets).
+            // Le layer s'appuie sur 'building' s'il est disponible (satellite-streets en dispose).
+            if (!map.getLayer('3d-buildings')) {
+                map.addLayer({
+                    'id': '3d-buildings',
+                    'source': 'composite',
+                    'source-layer': 'building',
+                    'filter': ['==', 'extrude', 'true'],
+                    'type': 'fill-extrusion',
+                    'minzoom': 15,
+                    'paint': {
+                        'fill-extrusion-color': '#aaa',
+                        'fill-extrusion-height': ['get', 'height'],
+                        'fill-extrusion-base': ['get', 'min_height'],
+                        'fill-extrusion-opacity': 0.6
+                    }
+                });
+            }
+
+            // Autorise la rotation 3D avec clic droit
+            map.dragRotate.enable();
+            map.touchZoomRotate.enableRotation();
+        }
+
+        /**
+         * Basculer le style (jour/nuit + satellite oui/non) 
+         * et relancer les features 3D quand le style est chargé.
+         */
+        function switchMapStyle() {
+            const newStyle = getCurrentMapStyle();
+            map.setStyle(newStyle);
+            map.on('style.load', () => {
+                add3DFeatures();
+                // Réaffiche les marqueurs, etc.
+                Object.values(beaconMarkers).forEach(m => m.addTo(map));
+                Object.values(markers).forEach(m => m.addTo(map));
+                displayGeofences();
+            });
+        }
+        // ----------------------------------------------------
 
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
@@ -795,25 +912,7 @@
             return { offsetLng, offsetLat };
         }
 
-        /**
-         * Renvoie l'URL de l'icône batterie en tenant compte 
-         * de la tension 12V ou 24V.
-         */
         function getBatteryIcon(voltage) {
-            // --- LOGIQUE 12V ---
-            // <10.5 => lv0
-            // <12.0 => lv1
-            // <12.35 => lv2
-            // <12.6 => lv3
-            // >=12.6 => lv4
-
-            // --- LOGIQUE 24V ---
-            // <20 => lv0
-            // <24 => lv1
-            // <25.2 => lv2
-            // <26.4 => lv3
-            // >=26.4 => lv4
-
             if (voltage < 18) {
                 // Cas 12V
                 if (voltage < 10.5) {
@@ -843,10 +942,6 @@
             }
         }
 
-        /**
-         * Renvoie un message texte adapté à l'état de la batterie, 
-         * selon qu'on est en 12V ou 24V.
-         */
         function getBatteryTooltip(voltage) {
             if (voltage < 18) {
                 // Cas 12V
@@ -877,9 +972,6 @@
             }
         }
 
-        /**
-         * Renvoie un label sur la dernière connexion (vert/orange/rouge).
-         */
         function getLastConnectionLabel(lastTimeISO) {
             if (!lastTimeISO) return '';
             const lastTime = new Date(lastTimeISO).getTime();
@@ -896,10 +988,6 @@
             }
         }
 
-        /**
-         * Calcule le total d'heures moteur, 
-         * selon qu'on est en 12V ou 24V (conditions).
-         */
         function calculateEngineHours(positions) {
             if (!positions || positions.length < 2) return 0;
             let totalMs = 0;
@@ -975,7 +1063,6 @@
             return "Aucune";
         }
 
-        // --- AJOUT POUR AFFICHER LES GEOFENCES ---
         function approximateCircle(centerLat, centerLon, radiusM, points=64) {
             const coords = [];
             const radLat = centerLat * Math.PI / 180;
@@ -1081,12 +1168,7 @@
                 }
             });
         }
-        // --- FIN AJOUT POUR AFFICHER LES GEOFENCES ---
 
-        /**
-         * Bâtit un tableau (time, on/off, geofence) 
-         * en tenant compte de la différence 12V / 24V.
-         */
         function buildEngineOnOffData(positions) {
             const result = [];
             positions.forEach(pos => {
@@ -1116,10 +1198,6 @@
             return result;
         }
 
-        /**
-         * Découpe le tableau ON/OFF en « trips » (démarrage => arrêt) 
-         * en prenant en compte la géofence de départ.
-         */
         function parseEngineTrips(onOffData) {
             let trips = [];
             let startTime = null;
@@ -1130,9 +1208,6 @@
                 const currentTime = onOffData[i].time;
                 const currentGeofence = onOffData[i].geofence;
                 const isLast = (i === onOffData.length - 1);
-
-                const nextTime = isLast ? currentTime : onOffData[i+1].time;
-                const nextGeofence = isLast ? currentGeofence : onOffData[i+1].geofence;
 
                 if (currentState === 1 && startTime === null) {
                     startTime = currentTime;
@@ -1167,7 +1242,6 @@
             return trips;
         }
 
-        // --- CHANGEMENTS POUR RENDRE LE GRAPHIQUE BATTERIE PERSONNALISÉ ---
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
@@ -1176,7 +1250,6 @@
             const oldLoading = document.getElementById('battery-loading-text');
             if (oldLoading) oldLoading.remove();
 
-            // On met la période par défaut : de minuit à maintenant
             const batteryNow = new Date();
             const batteryMidnight = new Date(batteryNow.getFullYear(), batteryNow.getMonth(), batteryNow.getDate(), 0, 0, 0);
             const batteryCurrentIso = new Date(batteryNow.getTime() - batteryNow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -1195,8 +1268,6 @@
             }
 
             modal.style.display = 'flex';
-
-            // On charge automatiquement les données pour la plage "aujourd'hui"
             loadBatteryDataForRange();
         }
 
@@ -1205,7 +1276,6 @@
             modal.style.display = 'none';
         }
 
-        // Nouvelle fonction qui utilise la plage personnalisée sélectionnée
         function loadBatteryDataForRange() {
             if (!currentBatteryDeviceId) {
                 alert("Aucun deviceId sélectionné pour le graphique.");
@@ -1277,11 +1347,9 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        // Ajout des lignes d’annotation pour repères de tension
                         plugins: {
                             annotation: {
                                 annotations: {
-                                    // Lignes pour 12V
                                     line105: {
                                         type: 'line',
                                         yMin: 10.5,
@@ -1330,7 +1398,6 @@
                                             position: 'end'
                                         }
                                     },
-                                    // Lignes pour 24V
                                     line200: {
                                         type: 'line',
                                         yMin: 20.0,
@@ -1414,7 +1481,6 @@
                 alert("Erreur lors de la récupération des données de tension: " + err.message);
             });
         }
-        // --- FIN CHANGEMENTS BATTERIE PERSONNALISÉE ---
 
         function showEngineModal(deviceId, defaultHours = 0) {
             currentEngineDeviceId = deviceId;
@@ -1613,7 +1679,6 @@
             document.body.removeChild(link);
         }
 
-        // --- FONCTIONS PRINCIPALES ---
         async function getTrackersData() {
             try {
                 // 1) Récupération liste des devices
@@ -2054,7 +2119,7 @@
                 }
             });
 
-            // --- AJOUT POUR AFFICHER LES GEOFENCES ---
+            // Ré-afficher les geofences
             displayGeofences();
         }
 
@@ -2116,16 +2181,9 @@
         }
 
         function setupMapSwitch() {
-            document.getElementById('map-switch').addEventListener('change', (event) => {
-                if (event.target.checked) {
-                    map.setStyle('mapbox://styles/mapbox/satellite-v9');
-                } else {
-                    map.setStyle('mapbox://styles/mapbox/streets-v11');
-                }
-            });
-            map.on('style.load', () => {
-                Object.values(beaconMarkers).forEach(m => m.addTo(map));
-                Object.values(markers).forEach(m => m.addTo(map));
+            const switchEl = document.getElementById('map-switch');
+            switchEl.addEventListener('change', () => {
+                switchMapStyle();
             });
         }
 
@@ -2428,14 +2486,23 @@
                 .then(data => {
                     beaconDefinitions = data;
                     mapboxgl.accessToken = MAPBOX_API_KEY;
+
+                    // Style initial en fonction du jour/nuit + satellite
+                    const initialStyle = getCurrentMapStyle();
+
                     map = new mapboxgl.Map({
                         container: 'map',
-                        style: 'mapbox://styles/mapbox/streets-v11',
+                        style: initialStyle,
                         center: [7.475422, 46.257917],
-                        zoom: 14
+                        zoom: 14,
+                        pitchWithRotate: true // Permet la vue 3D
                     });
                     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                    
                     map.on('load', () => {
+                        // Ajout des features 3D
+                        add3DFeatures();
+
                         getTrackersData();
                         updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
 
