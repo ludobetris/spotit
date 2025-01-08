@@ -21,7 +21,7 @@
             width: 100%;
             height: 100%;
             font-family: Arial, sans-serif;
-            overflow: hidden;
+            overflow: hidden; /* Empêche tout scrolling ou « dézoom » qui révélerait le menu */
         }
 
         #map {
@@ -32,7 +32,7 @@
 
         /* Panneaux de contrôle */
         #controls-container, #depot-container {
-            position: absolute;
+            position: fixed;        /* Au lieu de absolute */
             top: 0;
             bottom: 0;
             width: 250px;
