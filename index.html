@@ -10,23 +10,24 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
-    <!-- AJOUT DU PLUGIN POUR LES LIGNES D’ANNOTATION -->
+    <!-- Plugin pour les lignes d’annotation -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 
     <style>
+        /* On retire position: fixed et overflow:hidden pour éviter le décalage sur mobile */
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            overflow: hidden;
             font-family: Arial, sans-serif;
-            position: fixed; /* Assure que le contenu reste fixe et évite le glissement */
         }
+
         #map {
             width: 100%;
             height: 100%;
         }
+
         /* Panneaux de contrôle */
         #controls-container, #depot-container {
             position: absolute;
@@ -42,7 +43,7 @@
             box-sizing: border-box;
             transition: transform 0.3s ease;
             z-index: 21;
-            overflow-y: auto; /* Ajouté pour permettre le défilement si contenu trop long */
+            overflow-y: auto;
         }
         #controls-container {
             left: 0;
@@ -58,17 +59,20 @@
         #depot-container.active {
             transform: translateX(0);
         }
+
         /* Titres des panneaux */
         #controls-container h2, #depot-container h2 {
-            margin-top: 70px; /* Réduit la marge supérieure pour un meilleur alignement */
+            margin-top: 70px;
             margin-bottom: 10px;
             font-size: 1.2em;
             flex-shrink: 0;
         }
+
         /* Contenu des panneaux */
         #controls-content, #depot-content {
             flex-grow: 1;
         }
+
         /* Group checkboxes empilés verticalement */
         .group-checkbox {
             margin-bottom: 10px;
@@ -88,6 +92,7 @@
             margin-right: 10px;
             cursor: pointer;
         }
+
         /* Boutons de basculement */
         .toggle-button {
             position: absolute;
@@ -141,11 +146,12 @@
         #depot-content button:hover {
             text-decoration: underline;
         }
+
         /* Switch pour changer la vue de la carte */
         #map-switch-container {
             position: absolute;
             bottom: 20px;
-            left: 20px; /* Positionné discrètement au bas gauche */
+            left: 20px;
             background: rgba(255, 255, 255, 0.8);
             padding: 5px;
             border-radius: 5px;
@@ -160,10 +166,12 @@
             height: 20px;
             cursor: pointer;
         }
+
         /* Style pour descendre les contrôles de navigation en haut à droite */
         .mapboxgl-ctrl-top-right {
             top: 25%;
         }
+
         /* Barre de recherche d'adresse et sélection de tracker */
         #search-container {
             position: absolute;
@@ -203,11 +211,12 @@
         #search-button:hover {
             background: #0056b3;
         }
+
         /* Liste des suggestions */
         #suggestions-list {
             list-style: none;
             padding: 0;
-            margin-top: 5px; /* Marge au-dessus de la liste pour éviter de la coller au champ */
+            margin-top: 5px;
             background: #fff;
             border: 1px solid #ccc;
             display: none;
@@ -226,6 +235,7 @@
         #suggestions-list li:hover {
             background-color: #f0f0f0;
         }
+
         /* Sélecteur de tracker */
         #tracker-select {
             margin-left: 10px;
@@ -249,22 +259,23 @@
         #route-button:hover {
             background: #1e7e34;
         }
+
         /* Amélioration de l'apparence des listes */
         #group-list, #depot-list {
             display: flex;
             flex-direction: column;
         }
         
-        /* Timeline (remontée un peu : bottom: 60px) */
+        /* Timeline */
         #timeline-container {
             position: absolute;
-            bottom: 60px; /* Au lieu de 0 pour la remonter un peu */
+            bottom: 60px;
             left: 0;
             width: 100%;
             background: rgba(255, 255, 255, 0.9);
             padding: 10px;
             box-sizing: border-box;
-            display: none; /* Caché par défaut */
+            display: none;
             align-items: center;
             justify-content: center;
             box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
@@ -290,7 +301,7 @@
             pointer-events: none;
         }
 
-        /* Modal Overlay => plein écran */
+        /* Modal Overlay */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -298,12 +309,11 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
-            display: none; /* Par défaut caché */
+            display: none; 
             align-items: center;
             justify-content: center;
             z-index: 100;
         }
-        /* Contenu du modal => occupe quasi tout l'écran */
         .modal-content {
             background: #fff;
             width: 100%;
@@ -401,11 +411,11 @@
             border-radius: 50%;
         }
 
-        /* --- AJOUTS pour que l'input range puisse afficher un dégradé visible --- */
+        /* Input range : affichage d'un dégradé au besoin */
         #timeline {
-            -webkit-appearance: none; /* Nécessaire pour Chrome/Safari */
+            -webkit-appearance: none;
             appearance: none;
-            background: #ccc; /* Couleur par défaut si pas de variable */
+            background: #ccc; 
             height: 8px;
             border-radius: 5px;
             outline: none;
@@ -604,10 +614,9 @@
     <div id="battery-modal" class="modal-overlay">
         <div id="battery-modal-content" class="modal-content">
             <button id="battery-modal-close" class="modal-close-btn">Fermer</button>
-            <!-- On renomme le titre pour refléter la plage personnalisée -->
             <h3>Historique de tension</h3>
 
-            <!-- AJOUTS POUR LES DATES BATTERIE -->
+            <!-- Sélecteurs de date/heure pour la batterie -->
             <div class="engine-controls">
                 <label for="battery-start">Début :</label>
                 <input type="datetime-local" id="battery-start">
@@ -617,7 +626,6 @@
 
                 <button id="battery-calc-button">Afficher</button>
             </div>
-            <!-- FIN AJOUTS POUR LES DATES BATTERIE -->
 
             <canvas id="battery-chart"></canvas>
         </div>
@@ -645,7 +653,6 @@
                 <!-- Tableau des trajets apparaîtra ici -->
             </div>
 
-            <!-- Bouton pour exporter en Excel -->
             <button id="export-engine-button">Exporter en Excel</button>
 
             <div style="margin-top:20px;">
@@ -674,7 +681,7 @@
         <h2>Groupes</h2>
         <div id="controls-content">
             <div id="group-list">
-                <!-- Les cases à cocher des groupes seront générées dynamiquement -->
+                <!-- Cases à cocher des groupes -->
             </div>
         </div>
     </div>
@@ -734,10 +741,10 @@
         // Définitions des beacons
         let beaconDefinitions = [];
 
-        // --- NOUVELLE VARIABLE GLOBALE POUR LES GEOFENCES ---
+        // Geofences
         let geofences = [];
 
-        // Coordonnées de référence pour "Rue des Etreys 38 à Grône"
+        // Coordonnées de référence du dépôt
         const depotCoordinates = [7.475422, 46.257917]; 
 
         // Variables pour la timeline
@@ -756,16 +763,20 @@
         // Ensemble pour conserver les groupes cochés
         let checkedGroupsSet = new Set();
 
-        // Utilisé pour l'historique de tension dans le modal
+        // Graphique batterie
         let currentBatteryDeviceId = null;
         let batteryChart = null;
 
-        // Utilisé pour l'horaire moteur
+        // Graphique moteur
         let currentEngineDeviceId = null;
         let engineChart = null;
         let currentEngineTrips = [];
 
-        // --- FONCTIONS UTILITAIRES ---
+        // Pour la géolocalisation en direct (marqueur bleu)
+        let myLocationMarker = null;
+        let watchPositionId = null;
+
+        // --- UTILITAIRES ---
 
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
@@ -795,19 +806,15 @@
             return { offsetLng, offsetLat };
         }
 
-        /**
-         * Renvoie l'URL de l'icône batterie en tenant compte 
-         * de la tension 12V ou 24V.
-         */
         function getBatteryIcon(voltage) {
-            // --- LOGIQUE 12V ---
+            // Logique 12V
             // <10.5 => lv0
             // <12.0 => lv1
             // <12.35 => lv2
             // <12.6 => lv3
             // >=12.6 => lv4
-
-            // --- LOGIQUE 24V ---
+            //
+            // Logique 24V
             // <20 => lv0
             // <24 => lv1
             // <25.2 => lv2
@@ -843,49 +850,42 @@
             }
         }
 
-        /**
-         * Renvoie un message texte adapté à l'état de la batterie, 
-         * selon qu'on est en 12V ou 24V.
-         */
         function getBatteryTooltip(voltage) {
             if (voltage < 18) {
                 // Cas 12V
                 if (voltage < 10.5) {
-                    return "Tension <10.5V : Batterie HS (soudure coupée ou décharge profonde).";
+                    return "Tension <10.5V : Batterie HS ou très déchargée.";
                 } else if (voltage < 12.0) {
-                    return "Tension ~12.0V : Batterie endommagée, décharge profonde. À recharger + test d'effort.";
+                    return "Tension ~12.0V : Batterie endommagée ou faible.";
                 } else if (voltage < 12.35) {
-                    return "Tension ~12.2V : Entre 12.0 et 12.35 => 25-50% de charge, attention à l'endommagement.";
+                    return "Tension 12.0-12.35V : 25-50% de charge.";
                 } else if (voltage < 12.6) {
-                    return "Tension ~12.35-12.59V : 50-99%. En dessous de 12.35V, elle s'endommage à long terme.";
+                    return "Tension 12.35-12.59V : 50-99% de charge.";
                 } else {
-                    return "Tension >= 12.60V : 100% Batterie chargée.";
+                    return "Tension >=12.6V : 100% chargée.";
                 }
             } else {
                 // Cas 24V
                 if (voltage < 20) {
-                    return "Tension <20V : Batterie HS ou très basse (24V).";
+                    return "Tension <20V : Batterie HS ou très faible (24V).";
                 } else if (voltage < 24) {
-                    return "Tension entre 20V et 24V : Endommagée, à recharger + test d'effort.";
+                    return "Tension 20-24V : Batterie faible.";
                 } else if (voltage < 25.2) {
-                    return "Tension entre 24V et 25.2V : 25-50% de charge.";
+                    return "Tension 24-25.2V : 25-50% de charge.";
                 } else if (voltage < 26.4) {
-                    return "Tension entre 25.2V et 26.4V : 50-99%.";
+                    return "Tension 25.2-26.4V : 50-99% de charge.";
                 } else {
-                    return "Tension >= 26.4V : 100% Batterie chargée (24V).";
+                    return "Tension >=26.4V : 100% chargée (24V).";
                 }
             }
         }
 
-        /**
-         * Renvoie un label sur la dernière connexion (vert/orange/rouge).
-         */
         function getLastConnectionLabel(lastTimeISO) {
             if (!lastTimeISO) return '';
             const lastTime = new Date(lastTimeISO).getTime();
             const now = Date.now();
             const diffMs = now - lastTime; 
-            const diffMin = Math.floor(diffMs / 1000 / 60);
+            const diffMin = Math.floor(diffMs / 60000);
 
             if (diffMin <= 1) {
                 return '<span style="color: green;">En ligne</span>';
@@ -896,10 +896,6 @@
             }
         }
 
-        /**
-         * Calcule le total d'heures moteur, 
-         * selon qu'on est en 12V ou 24V (conditions).
-         */
         function calculateEngineHours(positions) {
             if (!positions || positions.length < 2) return 0;
             let totalMs = 0;
@@ -909,13 +905,12 @@
                 const currentTime = new Date(positions[i].deviceTime).getTime();
 
                 if (powerVal < 18) {
-                    // Logique 12V
+                    // 12V => ON si >=13.8 && <15
                     if (powerVal >= 13.8 && powerVal < 15) {
                         totalMs += (nextTime - currentTime);
                     }
                 } else {
-                    // Logique 24V
-                    // Moteur ON si powerVal >= 27.2
+                    // 24V => ON si >= 27.2
                     if (powerVal >= 27.2) {
                         totalMs += (nextTime - currentTime);
                     }
@@ -924,11 +919,10 @@
             return totalMs / (1000 * 3600);
         }
 
-        // GESTION GEOFENCES
+        // Gestions geofences (simplifiée pour conserver l'existant)
         function isInsideGeofence(lat, lon, geofence) {
-            if (!geofence.area) return false; 
+            if (!geofence.area) return false;
             const area = geofence.area.trim();
-
             if (area.startsWith("CIRCLE")) {
                 const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
                 const match = area.match(regexCircle);
@@ -936,8 +930,6 @@
                 const circleLat = parseFloat(match[1]);
                 const circleLon = parseFloat(match[2]);
                 const radius = parseFloat(match[3]);
-                if (isNaN(circleLat) || isNaN(circleLon) || isNaN(radius)) return false;
-
                 const dist = getDistanceFromLatLonInMeters(lat, lon, circleLat, circleLon);
                 return dist <= radius;
             } else if (area.startsWith("POLYGON")) {
@@ -947,12 +939,10 @@
                 const coordsStr = match[1].trim();
                 const coordPairs = coordsStr.split(",").map(s => s.trim().split(" "));
                 let polygon = coordPairs.map(cp => [parseFloat(cp[1]), parseFloat(cp[0])]);
-
                 return pointInPolygon([lon, lat], polygon);
             }
             return false;
         }
-
         function pointInPolygon(point, vs) {
             let x = point[0], y = point[1];
             let inside = false;
@@ -965,7 +955,6 @@
             }
             return inside;
         }
-
         function getGeofenceName(lat, lon, geofencesList) {
             for (const gf of geofencesList) {
                 if (isInsideGeofence(lat, lon, gf)) {
@@ -975,11 +964,10 @@
             return "Aucune";
         }
 
-        // --- AJOUT POUR AFFICHER LES GEOFENCES ---
         function approximateCircle(centerLat, centerLon, radiusM, points=64) {
             const coords = [];
             const radLat = centerLat * Math.PI / 180;
-            const distPerDegLat = 111300; // approx
+            const distPerDegLat = 111300; 
             const distPerDegLon = 111300 * Math.cos(radLat);
 
             for (let i = 0; i < points; i++) {
@@ -1004,13 +992,10 @@
             if (map.getSource('geofences-source')) {
                 map.removeSource('geofences-source');
             }
-
             const features = [];
-
             geofences.forEach(gf => {
                 if (!gf.area) return;
                 const area = gf.area.trim();
-
                 if (area.startsWith("CIRCLE")) {
                     const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
                     const match = area.match(regexCircle);
@@ -1018,17 +1003,15 @@
                         const lat = parseFloat(match[1]);
                         const lon = parseFloat(match[2]);
                         const radiusM = parseFloat(match[3]);
-                        if (!isNaN(lat) && !isNaN(lon) && !isNaN(radiusM)) {
-                            const circleCoords = approximateCircle(lat, lon, radiusM);
-                            features.push({
-                                type: 'Feature',
-                                properties: { name: gf.name },
-                                geometry: {
-                                    type: 'Polygon',
-                                    coordinates: [ circleCoords ]
-                                }
-                            });
-                        }
+                        const circleCoords = approximateCircle(lat, lon, radiusM);
+                        features.push({
+                            type: 'Feature',
+                            properties: { name: gf.name },
+                            geometry: {
+                                type: 'Polygon',
+                                coordinates: [ circleCoords ]
+                            }
+                        });
                     }
                 } else if (area.startsWith("POLYGON")) {
                     const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
@@ -1081,12 +1064,7 @@
                 }
             });
         }
-        // --- FIN AJOUT POUR AFFICHER LES GEOFENCES ---
 
-        /**
-         * Bâtit un tableau (time, on/off, geofence) 
-         * en tenant compte de la différence 12V / 24V.
-         */
         function buildEngineOnOffData(positions) {
             const result = [];
             positions.forEach(pos => {
@@ -1102,11 +1080,9 @@
                     // 24V => ON si >=27.2
                     on = (powerVal >= 27.2) ? 1 : 0;
                 }
-
                 const lat = parseFloat(pos.latitude);
                 const lon = parseFloat(pos.longitude);
                 const gfName = getGeofenceName(lat, lon, geofences);
-
                 result.push({
                     time: new Date(pos.deviceTime),
                     on: on,
@@ -1116,10 +1092,6 @@
             return result;
         }
 
-        /**
-         * Découpe le tableau ON/OFF en « trips » (démarrage => arrêt) 
-         * en prenant en compte la géofence de départ.
-         */
         function parseEngineTrips(onOffData) {
             let trips = [];
             let startTime = null;
@@ -1131,20 +1103,18 @@
                 const currentGeofence = onOffData[i].geofence;
                 const isLast = (i === onOffData.length - 1);
 
-                const nextTime = isLast ? currentTime : onOffData[i+1].time;
-                const nextGeofence = isLast ? currentGeofence : onOffData[i+1].geofence;
-
                 if (currentState === 1 && startTime === null) {
                     startTime = currentTime;
                     startGeofence = currentGeofence;
                 }
-
                 if (startTime !== null) {
+                    const nextTime = isLast ? currentTime : onOffData[i+1].time;
+                    const nextGeofence = isLast ? currentGeofence : onOffData[i+1].geofence;
                     const geofenceChanged = (currentGeofence !== startGeofence);
                     const engineOff = (currentState === 0);
 
                     if (geofenceChanged || engineOff || isLast) {
-                        const endTime = engineOff ? currentTime : currentTime; 
+                        const endTime = engineOff ? currentTime : currentTime;
                         let diffMs = endTime - startTime;
                         let hours = diffMs / 3600000;
                         trips.push({
@@ -1167,16 +1137,15 @@
             return trips;
         }
 
-        // --- CHANGEMENTS POUR RENDRE LE GRAPHIQUE BATTERIE PERSONNALISÉ ---
+        // --- AFFICHAGE DU GRAPHIQUE BATTERIE ---
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
-
             const batteryModalContent = document.getElementById('battery-modal-content');
             const oldLoading = document.getElementById('battery-loading-text');
             if (oldLoading) oldLoading.remove();
 
-            // On met la période par défaut : de minuit à maintenant
+            // Défaut : minuit à maintenant
             const batteryNow = new Date();
             const batteryMidnight = new Date(batteryNow.getFullYear(), batteryNow.getMonth(), batteryNow.getDate(), 0, 0, 0);
             const batteryCurrentIso = new Date(batteryNow.getTime() - batteryNow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -1193,10 +1162,9 @@
                 batteryChart.destroy();
                 batteryChart = null;
             }
-
             modal.style.display = 'flex';
 
-            // On charge automatiquement les données pour la plage "aujourd'hui"
+            // Charger automatiquement la plage "aujourd'hui"
             loadBatteryDataForRange();
         }
 
@@ -1205,7 +1173,6 @@
             modal.style.display = 'none';
         }
 
-        // Nouvelle fonction qui utilise la plage personnalisée sélectionnée
         function loadBatteryDataForRange() {
             if (!currentBatteryDeviceId) {
                 alert("Aucun deviceId sélectionné pour le graphique.");
@@ -1259,6 +1226,12 @@
                     alert("Aucune donnée de tension (champ 'power') dans cette plage.");
                     return;
                 }
+                
+                // On calcule min/max pour un scale Y dynamique
+                const minVal = Math.min(...powers);
+                const maxVal = Math.max(...powers);
+                const margin = 0.5; // marge autour
+
                 const ctx = document.getElementById('battery-chart').getContext('2d');
                 if (batteryChart) {
                     batteryChart.destroy();
@@ -1277,11 +1250,10 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        // Ajout des lignes d’annotation pour repères de tension
                         plugins: {
                             annotation: {
                                 annotations: {
-                                    // Lignes pour 12V
+                                    // Les lignes d’annotation restent (si hors champ, elles n’apparaîtront pas ou seront coupées)
                                     line105: {
                                         type: 'line',
                                         yMin: 10.5,
@@ -1326,11 +1298,10 @@
                                         borderWidth: 1,
                                         label: {
                                             enabled: true,
-                                            content: '12.6V (100%)',
+                                            content: '12.6V',
                                             position: 'end'
                                         }
                                     },
-                                    // Lignes pour 24V
                                     line200: {
                                         type: 'line',
                                         yMin: 20.0,
@@ -1375,7 +1346,7 @@
                                         borderWidth: 1,
                                         label: {
                                             enabled: true,
-                                            content: '26.4V (100%)',
+                                            content: '26.4V',
                                             position: 'end'
                                         }
                                     }
@@ -1397,6 +1368,8 @@
                                 }
                             },
                             y: {
+                                min: Math.floor(minVal - margin),
+                                max: Math.ceil(maxVal + margin),
                                 title: {
                                     display: true,
                                     text: 'Voltage (V)'
@@ -1414,13 +1387,12 @@
                 alert("Erreur lors de la récupération des données de tension: " + err.message);
             });
         }
-        // --- FIN CHANGEMENTS BATTERIE PERSONNALISÉE ---
 
+        // --- ENGINE MODAL ---
         function showEngineModal(deviceId, defaultHours = 0) {
             currentEngineDeviceId = deviceId;
             const modal = document.getElementById('engine-modal');
             document.getElementById('engine-result').textContent = `Heures moteur (journée) : ~${defaultHours.toFixed(2)} h`;
-
             document.getElementById('engine-trips-list').innerHTML = '';
             currentEngineTrips = [];
 
@@ -1428,7 +1400,6 @@
                 engineChart.destroy();
                 engineChart = null;
             }
-
             const now = new Date();
             const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
             const currentIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -1440,8 +1411,7 @@
         }
 
         function closeEngineModal() {
-            const modal = document.getElementById('engine-modal');
-            modal.style.display = 'none';
+            document.getElementById('engine-modal').style.display = 'none';
         }
 
         function loadEngineDataForRange() {
@@ -1455,7 +1425,6 @@
                 alert("Merci de renseigner la date/heure début et fin.");
                 return;
             }
-
             const fromISO = new Date(startInput).toISOString();
             const toISO = new Date(endInput).toISOString();
 
@@ -1478,13 +1447,11 @@
                     return;
                 }
                 data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
-
                 const onOffData = buildEngineOnOffData(data);
                 const trips = parseEngineTrips(onOffData);
                 currentEngineTrips = trips;
 
                 let totalHours = trips.reduce((acc, t) => acc + t.hours, 0);
-
                 document.getElementById('engine-result').textContent = 
                     `Heures moteur (plage sélectionnée) : ~${totalHours.toFixed(2)} h`;
 
@@ -1553,12 +1520,10 @@
         function displayEngineTripsTable(trips) {
             const container = document.getElementById('engine-trips-list');
             container.innerHTML = '';
-
             if (!trips || !trips.length) {
                 container.textContent = 'Aucun trajet moteur ON->OFF trouvé.';
                 return;
             }
-
             let tableHtml = `
                 <table id="engine-trips-table">
                     <thead>
@@ -1595,7 +1560,6 @@
             }
             let csvContent = "data:text/csv;charset=utf-8,";
             csvContent += "Début;Fin;Heures;Géofence\n";
-
             currentEngineTrips.forEach(t => {
                 const startStr = t.start.toLocaleString().replace(/;/g, ",");
                 const endStr = t.end.toLocaleString().replace(/;/g, ",");
@@ -1603,7 +1567,6 @@
                 const gfStr = t.geofence.replace(/;/g, ",");
                 csvContent += `${startStr};${endStr};${hoursStr};${gfStr}\n`;
             });
-
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
@@ -1616,7 +1579,7 @@
         // --- FONCTIONS PRINCIPALES ---
         async function getTrackersData() {
             try {
-                // 1) Récupération liste des devices
+                // 1) devices
                 const devicesResponse = await fetch('https://xf5655945.traccar.com/api/devices', {
                     method: 'GET',
                     headers: {
@@ -1625,11 +1588,11 @@
                     }
                 });
                 if (!devicesResponse.ok) {
-                    throw new Error("Erreur lors de la récupération des devices: " + devicesResponse.statusText);
+                    throw new Error("Erreur récupération devices: " + devicesResponse.statusText);
                 }
                 const devicesData = await devicesResponse.json();
 
-                // 2) Récupération de la liste des groupes
+                // 2) groupes
                 const groupsResponse = await fetch('https://xf5655945.traccar.com/api/groups', {
                     method: 'GET',
                     headers: {
@@ -1638,7 +1601,7 @@
                     }
                 });
                 if (!groupsResponse.ok) {
-                    throw new Error("Erreur lors de la récupération des groupes: " + groupsResponse.statusText);
+                    throw new Error("Erreur récupération groupes: " + groupsResponse.statusText);
                 }
                 const groupsData = await groupsResponse.json();
                 groups = groupsData;
@@ -1646,14 +1609,14 @@
                     groupIdToName[group.id] = group.name;
                 });
 
-                // Cocher tous les groupes sauf 'Beacons' par défaut
+                // Cocher par défaut tous les groupes sauf 'Beacons'
                 groups.forEach(group => {
                     if (group.name !== 'Beacons') {
                         checkedGroupsSet.add(group.name);
                     }
                 });
 
-                // --- RÉCUPÉRATION DES GEOFENCES ---
+                // geofences
                 const geofencesResp = await fetch('https://xf5655945.traccar.com/api/geofences', {
                     method: 'GET',
                     headers: {
@@ -1662,7 +1625,7 @@
                     }
                 });
                 if (!geofencesResp.ok) {
-                    console.warn("Erreur lors de la récupération des geofences:", geofencesResp.statusText);
+                    console.warn("Erreur récupération geofences:", geofencesResp.statusText);
                 } else {
                     geofences = await geofencesResp.json();
                 }
@@ -1672,6 +1635,7 @@
                 const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString(); 
                 const finalDevices = [];
 
+                // On boucle sur chaque device
                 for (const dev of devicesData) {
                     const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
                     const positionsUrl = `https://xf5655945.traccar.com/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
@@ -1684,7 +1648,7 @@
                         }
                     });
                     if (!positionsResp.ok) {
-                        console.warn(`Erreur positions pour device ${dev.id}: ${positionsResp.statusText}`);
+                        console.warn(`Erreur positions device ${dev.id}: ${positionsResp.statusText}`);
                         continue;
                     }
                     const positionsData = await positionsResp.json();
@@ -1708,6 +1672,7 @@
                     const lon = parseFloat(lastPos.longitude);
 
                     let powers = [];
+                    // On récupère les 3 dernières tensions
                     for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
                         let pVal = positionsData[i].attributes?.power;
                         if (pVal !== undefined) {
@@ -1717,7 +1682,6 @@
                             }
                         }
                     }
-
                     let avgV = null;
                     if (powers.length > 0) {
                         const sum = powers.reduce((acc, val) => acc + val, 0);
@@ -1740,10 +1704,9 @@
                         lastConnectionTime: lastPos.deviceTime
                     });
                 }
-
                 trackers = finalDevices;
 
-                // 3) Beacons
+                // 3) Récupération des beacons
                 const currentPositionsResp = await fetch('https://xf5655945.traccar.com/api/positions', {
                     method: 'GET',
                     headers: {
@@ -1767,7 +1730,6 @@
 
                             const rssi = position.attributes[rssiKey];
                             const { offsetLng, offsetLat } = getBeaconOffset(rssi, i, 20);
-
                             const beaconLng = parseFloat(position.longitude) + offsetLng;
                             const beaconLat = parseFloat(position.latitude) + offsetLat;
 
@@ -1778,11 +1740,7 @@
                                 beaconName = beaconDef.name;
                                 beaconIconUrl = beaconDef.iconUrl || null;
                             }
-
-                            if (
-                                !beacons[beaconId] ||
-                                new Date(position.deviceTime) > new Date(beacons[beaconId].lastSeen)
-                            ) {
+                            if (!beacons[beaconId] || new Date(position.deviceTime) > new Date(beacons[beaconId].lastSeen)) {
                                 beacons[beaconId] = {
                                     id: beaconId,
                                     name: beaconName,
@@ -1800,32 +1758,30 @@
 
                 displayGroupCheckboxes();
                 populateTrackerSelect();
-                updateMap();          // Met à jour la carte
-                populateDepotList();  // Met à jour la liste "Dépôt"
+                updateMap();
+                populateDepotList();
 
             } catch (err) {
-                console.error('Erreur lors de la récupération des données trackers:', err);
-                alert('Une erreur est survenue lors de la récupération des données des trackers.');
+                console.error('Erreur trackers:', err);
+                alert('Une erreur est survenue lors de la récupération des données.');
             }
         }
 
         function displayGroupCheckboxes() {
             const groupList = document.getElementById('group-list');
             groupList.innerHTML = '';
-
             const uniqueGroups = [
                 ...new Set([
                     ...trackers.map(t => t.group),
                     ...Object.values(beacons).map(b => b.group)
                 ])
             ].sort();
-
             uniqueGroups.forEach(groupe => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.classList.add('group-checkbox');
                 checkbox.dataset.groupe = groupe;
-                checkbox.checked = checkedGroupsSet.has(groupe) ? true : false;
+                checkbox.checked = checkedGroupsSet.has(groupe);
 
                 checkbox.addEventListener('change', (event) => {
                     if (event.target.checked) {
@@ -1839,7 +1795,6 @@
                 const label = document.createElement('label');
                 label.textContent = groupe;
                 label.prepend(checkbox);
-
                 groupList.appendChild(label);
             });
         }
@@ -1847,7 +1802,6 @@
         function populateTrackerSelect() {
             const trackerSelect = document.getElementById('tracker-select');
             const currentValue = trackerSelect.value;
-
             trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
 
             const combinedList = [
@@ -1870,7 +1824,6 @@
                 option.textContent = item.name;
                 trackerSelect.appendChild(option);
             });
-
             trackerSelect.value = currentValue;
             trackerSelect.removeEventListener('change', trackerSelectChangeHandler);
             trackerSelect.addEventListener('change', trackerSelectChangeHandler);
@@ -1886,13 +1839,12 @@
                 id = val;
             } else {
                 type = val.substring(0, idx);
-                id = val.substring(idx+1);
+                id = val.substring(idx + 1);
             }
-
             if (type === 'tracker') {
                 const selected = trackers.find(t => String(t.deviceId) === String(id));
                 if (selected && typeof selected.latitude === 'number' && typeof selected.longitude === 'number') {
-                    map.flyTo({ center: [selected.longitude, selected.latitude] });
+                    map.flyTo({ center: [selected.longitude, selected.latitude], zoom: map.getZoom() });
                     const marker = markers[selected.deviceId];
                     if (marker) {
                         openPopup(marker.getPopup());
@@ -1901,7 +1853,7 @@
             } else {
                 const bSel = beacons[id];
                 if (bSel && typeof bSel.latitude === 'number' && typeof bSel.longitude === 'number') {
-                    map.flyTo({ center: [bSel.longitude, bSel.latitude] });
+                    map.flyTo({ center: [bSel.longitude, bSel.latitude], zoom: map.getZoom() });
                     const marker = beaconMarkers[bSel.id];
                     if (marker) {
                         openPopup(marker.getPopup());
@@ -1911,23 +1863,22 @@
         }
 
         function openPopup(popup) {
+            if (currentPopup) {
+                currentPopup.remove();
+            }
             currentPopup = popup;
             currentPopup.addTo(map);
         }
 
         function updateMap() {
-            if (!map) {
-                return;
-            }
-
+            if (!map) return;
             const checkedGroups = Array.from(checkedGroupsSet);
-
             const visibleTrackerIds = [];
+
             trackers.forEach(t => {
                 if (!t.hasPositions) return;
                 if (!checkedGroups.includes(t.group)) return;
                 if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
-
                 visibleTrackerIds.push(String(t.deviceId));
 
                 let marker = markers[t.deviceId];
@@ -1950,7 +1901,6 @@
                         el.style.borderRadius = '50%';
                         el.style.backgroundColor = 'orange';
                     }
-
                     let popupHTML = `<strong>Nom:</strong> ${t.name}`;
                     if (t.avgVoltage !== null) {
                         const iconUrl = getBatteryIcon(t.avgVoltage);
@@ -1963,7 +1913,6 @@
                                 ${t.avgVoltage} V
                             </a>`;
                     }
-
                     if (t.engineHoursToday !== undefined) {
                         popupHTML += `<br/><strong>h moteur:</strong>
                             <a href="#" style="color:blue; text-decoration:underline;"
@@ -1971,12 +1920,10 @@
                                 ${t.engineHoursToday.toFixed(2)} h
                             </a>`;
                     }
-
                     const lastConnLabel = getLastConnectionLabel(t.lastConnectionTime);
                     if (lastConnLabel) {
                         popupHTML += `<br/><strong>Dernière connexion :</strong> ${lastConnLabel}`;
                     }
-
                     const popup = new mapboxgl.Popup({
                         closeButton: false,
                         offset: 25
@@ -2009,7 +1956,6 @@
             Object.values(beacons).forEach(b => {
                 if (!checkedGroups.includes(b.group)) return;
                 if (typeof b.longitude !== 'number' || typeof b.latitude !== 'number') return;
-
                 visibleBeaconIds.push(b.id);
 
                 let marker = beaconMarkers[b.id];
@@ -2024,7 +1970,6 @@
                         el = document.createElement('div');
                         el.className = 'beacon-marker';
                     }
-
                     const popup = new mapboxgl.Popup({
                         closeButton: false,
                         offset: 25
@@ -2039,7 +1984,6 @@
                         trackerSelect.value = `beacon-${b.id}`;
                         trackerSelect.dispatchEvent(new Event('change'));
                     });
-
                     marker.addTo(map);
                     beaconMarkers[b.id] = marker;
                 } else {
@@ -2054,7 +1998,7 @@
                 }
             });
 
-            // --- AJOUT POUR AFFICHER LES GEOFENCES ---
+            // Geofences
             displayGeofences();
         }
 
@@ -2126,6 +2070,7 @@
             map.on('style.load', () => {
                 Object.values(beaconMarkers).forEach(m => m.addTo(map));
                 Object.values(markers).forEach(m => m.addTo(map));
+                displayGeofences();
             });
         }
 
@@ -2169,7 +2114,7 @@
             document.getElementById('search-button').addEventListener('click', () => {
                 const q = searchInput.value.trim();
                 if (!q) {
-                    alert('Veuillez entrer une adresse à rechercher.');
+                    alert('Veuillez entrer une adresse.');
                     return;
                 }
                 fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_API_KEY}`)
@@ -2193,7 +2138,7 @@
                     })
                     .catch(err => {
                         console.error('Erreur géocodage:', err);
-                        alert('Une erreur est survenue lors de la recherche de l\'adresse.');
+                        alert('Une erreur est survenue lors de la recherche d\'adresse.');
                     });
             });
 
@@ -2241,7 +2186,6 @@
 
         function fetchAndDisplayRoute(trackerId, dateStr) {
             if (!trackerId || !dateStr) return;
-
             removeRoute();
             hideTimeline();
 
@@ -2250,7 +2194,6 @@
                 alert("Date invalide.");
                 return;
             }
-
             const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).toISOString();
             const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1).toISOString();
 
@@ -2270,7 +2213,6 @@
                     return;
                 }
                 data.sort((a, b) => new Date(a.time) - new Date(b.time));
-                
                 const coords = data.map(p => [parseFloat(p.longitude), parseFloat(p.latitude)]);
 
                 timelineData = data.map(p => ({
@@ -2278,7 +2220,6 @@
                     coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)],
                     motion: p.attributes?.motion === true 
                 }));
-
                 addRouteToMap(coords);
                 initializeTimeline();
             })
@@ -2298,7 +2239,6 @@
                     currentPopup.remove();
                     currentPopup = null;
                 }
-
                 const val = document.getElementById('tracker-select').value;
                 if (!val) {
                     alert("Sélectionner un tracker ou un beacon.");
@@ -2306,7 +2246,7 @@
                 }
                 const idx = val.indexOf('-');
                 let type = val.substring(0, idx);
-                let id = val.substring(idx+1);
+                let id = val.substring(idx + 1);
                 if (type === 'tracker') {
                     const selectedDate = routeDateInput.value; 
                     fetchAndDisplayRoute(id, selectedDate);
@@ -2314,10 +2254,9 @@
                     alert("La fonctionnalité de route n'est pas dispo pour les beacons.");
                 }
             });
-
             routeDateInput.addEventListener('change', () => {
                 const val = document.getElementById('tracker-select').value;
-                if (!val) return; 
+                if (!val) return;
                 const idx = val.indexOf('-');
                 let type = val.substring(0, idx);
                 let id = val.substring(idx+1);
@@ -2420,6 +2359,7 @@
         }
 
         function initializeMap() {
+            // On récupère le JSON des beacons
             fetch('https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json')
                 .then(r => {
                     if (!r.ok) throw new Error("Erreur beacons.json");
@@ -2435,23 +2375,29 @@
                         zoom: 14
                     });
                     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                    
                     map.on('load', () => {
                         getTrackersData();
                         updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
-
+                        // Géolocalisation continue
                         if (navigator.geolocation) {
-                            navigator.geolocation.getCurrentPosition(
+                            watchPositionId = navigator.geolocation.watchPosition(
                                 pos => {
                                     const { latitude, longitude } = pos.coords;
-                                    const popup = new mapboxgl.Popup({ closeButton: false })
-                                        .setHTML(`<strong>Ma localisation</strong>`);
-                                    const marker = new mapboxgl.Marker({ color: 'blue' })
-                                        .setLngLat([longitude, latitude])
-                                        .setPopup(popup)
-                                        .addTo(map);
-                                    marker.getElement().addEventListener('click', () => {
-                                        openPopup(marker.getPopup());
-                                    });
+                                    if (!myLocationMarker) {
+                                        // On crée un marqueur "cercle bleu"
+                                        const el = document.createElement('div');
+                                        el.style.width = '20px';
+                                        el.style.height = '20px';
+                                        el.style.borderRadius = '50%';
+                                        el.style.backgroundColor = 'blue';
+                                        el.style.boxShadow = '0 0 10px 2px rgba(0,0,255,0.5)';
+                                        myLocationMarker = new mapboxgl.Marker({ element: el })
+                                            .setLngLat([longitude, latitude])
+                                            .addTo(map);
+                                    } else {
+                                        myLocationMarker.setLngLat([longitude, latitude]);
+                                    }
                                 },
                                 err => {
                                     console.warn("Géolocalisation refusée:", err);
@@ -2474,8 +2420,6 @@
                     // Boutons de calcul / export
                     document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
                     document.getElementById('export-engine-button').addEventListener('click', exportEngineDataToExcel);
-
-                    // Bouton pour recharger la plage batterie
                     document.getElementById('battery-calc-button').addEventListener('click', loadBatteryDataForRange);
 
                     // On rend visible les éléments cachés
@@ -2495,6 +2439,10 @@
                 clearInterval(updateIntervalId);
                 updateIntervalId = null;
             }
+            if (watchPositionId) {
+                navigator.geolocation.clearWatch(watchPositionId);
+                watchPositionId = null;
+            }
         }
 
         window.addEventListener('beforeunload', () => {
@@ -2513,7 +2461,6 @@
             }
             MAPBOX_API_KEY = mapboxKeyInput;
             TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
-
             document.getElementById('credentials-modal').style.display = 'none';
             initializeMap();
         });
