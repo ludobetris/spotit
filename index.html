@@ -26,7 +26,8 @@
 
         #map {
             width: 100%;
-            height: 100%;
+            height: -webkit-fill-available; /* Permet de remplir l'espace dispo sur Safari iOS */
+            height: 100vh;                 /* S’applique sur la plupart des autres navigateurs */
         }
 
         /* Panneaux de contrôle */
