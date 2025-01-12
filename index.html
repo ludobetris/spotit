@@ -14,7 +14,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 
     <style>
-        /* On retire position: fixed et overflow:hidden pour éviter le décalage sur mobile */
         body, html {
             margin: 0;
             padding: 0;
@@ -32,7 +31,7 @@
 
         /* Panneaux de contrôle */
         #controls-container, #depot-container {
-            position: fixed;        /* Au lieu de absolute */
+            position: fixed;        
             top: 0;
             bottom: 0;
             width: 250px;
@@ -62,7 +61,6 @@
             transform: translateX(0);
         }
 
-        /* Titres des panneaux */
         #controls-container h2, #depot-container h2 {
             margin-top: 70px;
             margin-bottom: 10px;
@@ -70,12 +68,10 @@
             flex-shrink: 0;
         }
 
-        /* Contenu des panneaux */
         #controls-content, #depot-content {
             flex-grow: 1;
         }
 
-        /* Group checkboxes empilés verticalement */
         .group-checkbox {
             margin-bottom: 10px;
             overflow-y: auto;
@@ -95,7 +91,6 @@
             cursor: pointer;
         }
 
-        /* Boutons de basculement */
         .toggle-button {
             position: absolute;
             top: 20px;
@@ -121,7 +116,6 @@
             right: 20px;
         }
 
-        /* Liste "Dépôt" */
         #depot-content ul {
             list-style: none;
             padding: 0;
@@ -149,7 +143,6 @@
             text-decoration: underline;
         }
 
-        /* Switch pour changer la vue de la carte */
         #map-switch-container {
             position: absolute;
             bottom: 20px;
@@ -169,12 +162,10 @@
             cursor: pointer;
         }
 
-        /* Style pour descendre les contrôles de navigation en haut à droite */
         .mapboxgl-ctrl-top-right {
             top: 25%;
         }
 
-        /* Barre de recherche d'adresse et sélection de tracker */
         #search-container {
             position: absolute;
             top: 10px;
@@ -214,7 +205,6 @@
             background: #0056b3;
         }
 
-        /* Liste des suggestions */
         #suggestions-list {
             list-style: none;
             padding: 0;
@@ -238,7 +228,6 @@
             background-color: #f0f0f0;
         }
 
-        /* Sélecteur de tracker */
         #tracker-select {
             margin-left: 10px;
             padding: 5px;
@@ -247,7 +236,6 @@
             font-size: 16px;
             width: 100%;
         }
-        /* Bouton pour afficher la route */
         #route-button {
             margin-left: 10px;
             padding: 5px 10px;
@@ -262,13 +250,11 @@
             background: #1e7e34;
         }
 
-        /* Amélioration de l'apparence des listes */
         #group-list, #depot-list {
             display: flex;
             flex-direction: column;
         }
         
-        /* Timeline */
         #timeline-container {
             position: absolute;
             bottom: 60px;
@@ -303,7 +289,6 @@
             pointer-events: none;
         }
 
-        /* Modal Overlay */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -354,7 +339,6 @@
             height: 300px;
         }
 
-        /* Modal pour les identifiants (page de connexion) */
         #credentials-modal {
             position: fixed;
             top: 0;
@@ -405,15 +389,6 @@
             background: #0056b3;
         }
 
-        /* Style pour les marqueurs de beacons */
-        .beacon-marker {
-            background-color: blue;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-        }
-
-        /* Input range : affichage d'un dégradé au besoin */
         #timeline {
             -webkit-appearance: none;
             appearance: none;
@@ -449,7 +424,6 @@
             cursor: pointer;
         }
 
-        /* Media Queries pour les écrans de 768px et moins */
         @media (max-width: 768px) {
             #controls-container, #depot-container {
                 width: 80%;
@@ -495,7 +469,6 @@
             }
         }
 
-        /* Media Queries pour les écrans de 480px et moins */
         @media (max-width: 480px) {
             #controls-container, #depot-container {
                 width: 50%;
@@ -541,7 +514,6 @@
             margin-bottom: 10px;
         }
 
-        /* Tableau de trajets */
         #engine-trips-table {
             margin: 20px auto;
             border-collapse: collapse;
@@ -570,7 +542,6 @@
             background: #0056b3;
         }
 
-        /* Champ heure moteur */
         #engine-modal-content .engine-controls {
             display: flex;
             flex-direction: column;
@@ -618,7 +589,6 @@
             <button id="battery-modal-close" class="modal-close-btn">Fermer</button>
             <h3>Historique de tension</h3>
 
-            <!-- Sélecteurs de date/heure pour la batterie -->
             <div class="engine-controls">
                 <label for="battery-start">Début :</label>
                 <input type="datetime-local" id="battery-start">
@@ -651,9 +621,7 @@
 
             <div id="engine-result" style="text-align:center; font-weight:bold; margin-bottom:20px;"></div>
             
-            <div id="engine-trips-list" style="text-align:center; margin-bottom:20px;">
-                <!-- Tableau des trajets apparaîtra ici -->
-            </div>
+            <div id="engine-trips-list" style="text-align:center; margin-bottom:20px;"></div>
 
             <button id="export-engine-button">Exporter en Excel</button>
 
@@ -668,10 +636,8 @@
         <div class="search-bar">
             <input type="text" id="search-input" placeholder="Rechercher une adresse" autocomplete="off">
             <button id="search-button">🔍</button>
-            <!-- Liste des suggestions -->
             <ul id="suggestions-list"></ul>
         </div>
-        <!-- Sélecteur de tracker -->
         <select id="tracker-select">
             <option value="">Sélectionnez un device</option>
         </select>
@@ -690,9 +656,7 @@
     <div id="depot-container">
         <h2>Dépôt</h2>
         <div id="depot-content">
-            <ul id="depot-list">
-                <!-- Liste trackers/beacons dans un rayon de 200m -->
-            </ul>
+            <ul id="depot-list"></ul>
         </div>
     </div>
     
@@ -734,14 +698,9 @@
         let markers = {};
         let groups = [];
         let groupIdToName = {};
-        let beacons = {};
-        let beaconMarkers = {};
 
         // Variable pour n'afficher qu'une popup à la fois
         let currentPopup = null;
-
-        // Définitions des beacons
-        let beaconDefinitions = [];
 
         // Geofences
         let geofences = [];
@@ -762,7 +721,7 @@
         const UPDATE_INTERVAL = 10000;
         let updateIntervalId = null;
 
-        // Ensemble pour conserver les groupes cochés
+        // Ensemble pour conserver les groupes cochés (reste persistant tant que la page n'est pas rechargée)
         let checkedGroupsSet = new Set();
 
         // Graphique batterie
@@ -778,8 +737,7 @@
         let myLocationMarker = null;
         let watchPositionId = null;
 
-        // --- UTILITAIRES ---
-
+        // UTILITAIRE : Distance
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -792,37 +750,8 @@
             return R * c;
         }
 
-        function getBeaconOffset(rssi, index, total) {
-            const baseDistance = 0.00002; 
-            let distance;
-            if (rssi >= -40) {
-                distance = baseDistance; 
-            } else {
-                distance = baseDistance + (Math.abs(rssi) - 40) * 0.000001; 
-            }
-            const angleDeg = (index - 1) * (360 / total);
-            const angleRad = angleDeg * (Math.PI / 180);
-
-            const offsetLng = distance * Math.cos(angleRad);
-            const offsetLat = distance * Math.sin(angleRad);
-            return { offsetLng, offsetLat };
-        }
-
+        // Icônes batterie
         function getBatteryIcon(voltage) {
-            // Logique 12V
-            // <10.5 => lv0
-            // <12.0 => lv1
-            // <12.35 => lv2
-            // <12.6 => lv3
-            // >=12.6 => lv4
-            //
-            // Logique 24V
-            // <20 => lv0
-            // <24 => lv1
-            // <25.2 => lv2
-            // <26.4 => lv3
-            // >=26.4 => lv4
-
             if (voltage < 18) {
                 // Cas 12V
                 if (voltage < 10.5) {
@@ -851,7 +780,6 @@
                 }
             }
         }
-
         function getBatteryTooltip(voltage) {
             if (voltage < 18) {
                 // Cas 12V
@@ -882,6 +810,7 @@
             }
         }
 
+        // Dernière connexion
         function getLastConnectionLabel(lastTimeISO) {
             if (!lastTimeISO) return '';
             const lastTime = new Date(lastTimeISO).getTime();
@@ -898,6 +827,7 @@
             }
         }
 
+        // Heures moteur
         function calculateEngineHours(positions) {
             if (!positions || positions.length < 2) return 0;
             let totalMs = 0;
@@ -921,7 +851,7 @@
             return totalMs / (1000 * 3600);
         }
 
-        // Gestions geofences (simplifiée pour conserver l'existant)
+        // Geofences
         function isInsideGeofence(lat, lon, geofence) {
             if (!geofence.area) return false;
             const area = geofence.area.trim();
@@ -965,7 +895,6 @@
             }
             return "Aucune";
         }
-
         function approximateCircle(centerLat, centerLon, radiusM, points=64) {
             const coords = [];
             const radLat = centerLat * Math.PI / 180;
@@ -983,7 +912,6 @@
             coords.push(coords[0]);
             return coords;
         }
-
         function displayGeofences() {
             if (map.getLayer('geofences-fill')) {
                 map.removeLayer('geofences-fill');
@@ -1067,6 +995,7 @@
             });
         }
 
+        // ON/OFF moteur
         function buildEngineOnOffData(positions) {
             const result = [];
             positions.forEach(pos => {
@@ -1093,7 +1022,6 @@
             });
             return result;
         }
-
         function parseEngineTrips(onOffData) {
             let trips = [];
             let startTime = null;
@@ -1139,7 +1067,7 @@
             return trips;
         }
 
-        // --- AFFICHAGE DU GRAPHIQUE BATTERIE ---
+        // GRAPHIQUE BATTERIE
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
@@ -1147,7 +1075,6 @@
             const oldLoading = document.getElementById('battery-loading-text');
             if (oldLoading) oldLoading.remove();
 
-            // Défaut : minuit à maintenant
             const batteryNow = new Date();
             const batteryMidnight = new Date(batteryNow.getFullYear(), batteryNow.getMonth(), batteryNow.getDate(), 0, 0, 0);
             const batteryCurrentIso = new Date(batteryNow.getTime() - batteryNow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -1166,15 +1093,12 @@
             }
             modal.style.display = 'flex';
 
-            // Charger automatiquement la plage "aujourd'hui"
             loadBatteryDataForRange();
         }
-
         function closeVoltageChart() {
             const modal = document.getElementById('battery-modal');
             modal.style.display = 'none';
         }
-
         function loadBatteryDataForRange() {
             if (!currentBatteryDeviceId) {
                 alert("Aucun deviceId sélectionné pour le graphique.");
@@ -1229,10 +1153,9 @@
                     return;
                 }
                 
-                // On calcule min/max pour un scale Y dynamique
                 const minVal = Math.min(...powers);
                 const maxVal = Math.max(...powers);
-                const margin = 0.5; // marge autour
+                const margin = 0.5; 
 
                 const ctx = document.getElementById('battery-chart').getContext('2d');
                 if (batteryChart) {
@@ -1255,7 +1178,6 @@
                         plugins: {
                             annotation: {
                                 annotations: {
-                                    // Les lignes d’annotation restent (si hors champ, elles n’apparaîtront pas ou seront coupées)
                                     line105: {
                                         type: 'line',
                                         yMin: 10.5,
@@ -1390,7 +1312,7 @@
             });
         }
 
-        // --- ENGINE MODAL ---
+        // ENGINE MODAL
         function showEngineModal(deviceId, defaultHours = 0) {
             currentEngineDeviceId = deviceId;
             const modal = document.getElementById('engine-modal');
@@ -1411,11 +1333,9 @@
 
             modal.style.display = 'flex';
         }
-
         function closeEngineModal() {
             document.getElementById('engine-modal').style.display = 'none';
         }
-
         function loadEngineDataForRange() {
             if (!currentEngineDeviceId) {
                 alert("Aucun deviceId sélectionné.");
@@ -1518,7 +1438,6 @@
                 alert("Erreur lors de la récupération des données moteur: " + err.message);
             });
         }
-
         function displayEngineTripsTable(trips) {
             const container = document.getElementById('engine-trips-list');
             container.innerHTML = '';
@@ -1554,7 +1473,6 @@
             tableHtml += `</tbody></table>`;
             container.innerHTML = tableHtml;
         }
-
         function exportEngineDataToExcel() {
             if (!currentEngineTrips || !currentEngineTrips.length) {
                 alert("Aucune donnée à exporter.");
@@ -1578,7 +1496,7 @@
             document.body.removeChild(link);
         }
 
-        // --- FONCTIONS PRINCIPALES ---
+        // RÉCUPÉRATION TRACKERS
         async function getTrackersData() {
             try {
                 // 1) devices
@@ -1611,14 +1529,7 @@
                     groupIdToName[group.id] = group.name;
                 });
 
-                // Cocher par défaut tous les groupes sauf 'Beacons'
-                groups.forEach(group => {
-                    if (group.name !== 'Beacons') {
-                        checkedGroupsSet.add(group.name);
-                    }
-                });
-
-                // geofences
+                // 3) geofences
                 const geofencesResp = await fetch('https://xf5655945.traccar.com/api/geofences', {
                     method: 'GET',
                     headers: {
@@ -1631,6 +1542,10 @@
                 } else {
                     geofences = await geofencesResp.json();
                 }
+
+                // On ne re-coche plus systématiquement les groupes à chaque refresh.
+                // On se contente de les collecter et de rafraîchir la carte.
+                // => Les groupes décochés restent décochés.
 
                 const now = new Date();
                 const dateTo = now.toISOString();
@@ -1674,7 +1589,6 @@
                     const lon = parseFloat(lastPos.longitude);
 
                     let powers = [];
-                    // On récupère les 3 dernières tensions
                     for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
                         let pVal = positionsData[i].attributes?.power;
                         if (pVal !== undefined) {
@@ -1691,7 +1605,6 @@
                         avgV = Math.round(avgV * 100) / 100;
                     }
 
-                    // Calcul heures moteur sur la dernière journée
                     const engineHoursToday = calculateEngineHours(positionsData);
 
                     finalDevices.push({
@@ -1708,56 +1621,6 @@
                 }
                 trackers = finalDevices;
 
-                // 3) Récupération des beacons
-                const currentPositionsResp = await fetch('https://xf5655945.traccar.com/api/positions', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Basic ' + TRACCAR_AUTH,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const currentPositionsData = await currentPositionsResp.json();
-
-                beacons = {};
-                currentPositionsData.forEach(position => {
-                    for (let i = 1; i <= 20; i++) {
-                        const namespaceKey = `beacon${i}Namespace`;
-                        const instanceKey = `beacon${i}Instance`;
-                        const rssiKey = `beacon${i}Rssi`;
-
-                        if (position.attributes && position.attributes[namespaceKey] && position.attributes[instanceKey]) {
-                            const namespaceId = position.attributes[namespaceKey];
-                            const instanceId = position.attributes[instanceKey];
-                            const beaconId = `${namespaceId}-${instanceId}`;
-
-                            const rssi = position.attributes[rssiKey];
-                            const { offsetLng, offsetLat } = getBeaconOffset(rssi, i, 20);
-                            const beaconLng = parseFloat(position.longitude) + offsetLng;
-                            const beaconLat = parseFloat(position.latitude) + offsetLat;
-
-                            let beaconName = `Beacon ${namespaceId} ${instanceId}`;
-                            let beaconIconUrl = null;
-                            const beaconDef = beaconDefinitions.find(b => b.namespaceId.toLowerCase() === namespaceId.toLowerCase());
-                            if (beaconDef) {
-                                beaconName = beaconDef.name;
-                                beaconIconUrl = beaconDef.iconUrl || null;
-                            }
-                            if (!beacons[beaconId] || new Date(position.deviceTime) > new Date(beacons[beaconId].lastSeen)) {
-                                beacons[beaconId] = {
-                                    id: beaconId,
-                                    name: beaconName,
-                                    latitude: beaconLat,
-                                    longitude: beaconLng,
-                                    lastSeen: position.deviceTime,
-                                    rssi: rssi,
-                                    group: 'Beacons',
-                                    iconUrl: beaconIconUrl
-                                };
-                            }
-                        }
-                    }
-                });
-
                 displayGroupCheckboxes();
                 populateTrackerSelect();
                 updateMap();
@@ -1772,18 +1635,27 @@
         function displayGroupCheckboxes() {
             const groupList = document.getElementById('group-list');
             groupList.innerHTML = '';
+
+            // Récupère la liste unique des groupes présents dans trackers
             const uniqueGroups = [
-                ...new Set([
-                    ...trackers.map(t => t.group),
-                    ...Object.values(beacons).map(b => b.group)
-                ])
+                ...new Set(trackers.map(t => t.group))
             ].sort();
+
+            // Pour chaque groupe, on crée la case à cocher.
             uniqueGroups.forEach(groupe => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.classList.add('group-checkbox');
                 checkbox.dataset.groupe = groupe;
-                checkbox.checked = checkedGroupsSet.has(groupe);
+                // Coche si le set l'a déjà, sinon (si première fois) on le coche par défaut
+                if (checkedGroupsSet.has(groupe) || checkedGroupsSet.size === 0) {
+                    // Évite de forcer tout le monde => on vérifie si le set est vide.
+                    // Si c'est vide, on coche par défaut. Sinon on respecte ce qu'il y a.
+                    if (checkedGroupsSet.has(groupe) || checkedGroupsSet.size === 0) {
+                        checkedGroupsSet.add(groupe);
+                        checkbox.checked = true;
+                    }
+                }
 
                 checkbox.addEventListener('change', (event) => {
                     if (event.target.checked) {
@@ -1806,18 +1678,12 @@
             const currentValue = trackerSelect.value;
             trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
 
-            const combinedList = [
-                ...trackers.map(t => ({
-                    type: 'tracker',
-                    id: t.deviceId,
-                    name: t.name
-                })),
-                ...Object.values(beacons).map(b => ({
-                    type: 'beacon',
-                    id: b.id,
-                    name: b.name
-                }))
-            ];
+            // On n'ajoute que les trackers (les beacons sont supprimés du code)
+            const combinedList = trackers.map(t => ({
+                type: 'tracker',
+                id: t.deviceId,
+                name: t.name
+            }));
             combinedList.sort((a, b) => a.name.localeCompare(b.name));
 
             combinedList.forEach(item => {
@@ -1843,23 +1709,13 @@
                 type = val.substring(0, idx);
                 id = val.substring(idx + 1);
             }
-            if (type === 'tracker') {
-                const selected = trackers.find(t => String(t.deviceId) === String(id));
-                if (selected && typeof selected.latitude === 'number' && typeof selected.longitude === 'number') {
-                    map.flyTo({ center: [selected.longitude, selected.latitude], zoom: map.getZoom() });
-                    const marker = markers[selected.deviceId];
-                    if (marker) {
-                        openPopup(marker.getPopup());
-                    }
-                }
-            } else {
-                const bSel = beacons[id];
-                if (bSel && typeof bSel.latitude === 'number' && typeof bSel.longitude === 'number') {
-                    map.flyTo({ center: [bSel.longitude, bSel.latitude], zoom: map.getZoom() });
-                    const marker = beaconMarkers[bSel.id];
-                    if (marker) {
-                        openPopup(marker.getPopup());
-                    }
+            // On ne gère plus les beacons => toujours type=tracker
+            const selected = trackers.find(t => String(t.deviceId) === String(id));
+            if (selected && typeof selected.latitude === 'number' && typeof selected.longitude === 'number') {
+                map.flyTo({ center: [selected.longitude, selected.latitude], zoom: map.getZoom() });
+                const marker = markers[selected.deviceId];
+                if (marker) {
+                    openPopup(marker.getPopup());
                 }
             }
         }
@@ -1877,6 +1733,7 @@
             const checkedGroups = Array.from(checkedGroupsSet);
             const visibleTrackerIds = [];
 
+            // Affiche uniquement les trackers des groupes cochés
             trackers.forEach(t => {
                 if (!t.hasPositions) return;
                 if (!checkedGroups.includes(t.group)) return;
@@ -1962,56 +1819,11 @@
                 }
             });
 
+            // Supprime les marqueurs des trackers non visibles
             Object.keys(markers).forEach(deviceId => {
                 if (!visibleTrackerIds.includes(deviceId)) {
                     markers[deviceId].remove();
                     delete markers[deviceId];
-                }
-            });
-
-            const visibleBeaconIds = [];
-            Object.values(beacons).forEach(b => {
-                if (!checkedGroups.includes(b.group)) return;
-                if (typeof b.longitude !== 'number' || typeof b.latitude !== 'number') return;
-                visibleBeaconIds.push(b.id);
-
-                let marker = beaconMarkers[b.id];
-                if (!marker) {
-                    let el;
-                    if (b.iconUrl) {
-                        el = document.createElement('img');
-                        el.src = b.iconUrl;
-                        el.style.width = '50px';
-                        el.style.height = '50px';
-                    } else {
-                        el = document.createElement('div');
-                        el.className = 'beacon-marker';
-                    }
-                    const popup = new mapboxgl.Popup({
-                        closeButton: false,
-                        offset: 25
-                    }).setHTML(`<strong>Nom:</strong> ${b.name}<br><strong>RSSI:</strong> ${b.rssi}`);
-
-                    marker = new mapboxgl.Marker(el)
-                        .setLngLat([b.longitude, b.latitude])
-                        .setPopup(popup);
-
-                    marker.getElement().addEventListener('click', () => {
-                        const trackerSelect = document.getElementById('tracker-select');
-                        trackerSelect.value = `beacon-${b.id}`;
-                        trackerSelect.dispatchEvent(new Event('change'));
-                    });
-                    marker.addTo(map);
-                    beaconMarkers[b.id] = marker;
-                } else {
-                    marker.setLngLat([b.longitude, b.latitude]);
-                }
-            });
-
-            Object.keys(beaconMarkers).forEach(bId => {
-                if (!visibleBeaconIds.includes(bId)) {
-                    beaconMarkers[bId].remove();
-                    delete beaconMarkers[bId];
                 }
             });
 
@@ -2023,7 +1835,7 @@
             const depotList = document.getElementById('depot-list');
             depotList.innerHTML = '';
 
-            function addDepotListItem(item, isBeacon=false) {
+            function addDepotListItem(item) {
                 const dist = getDistanceFromLatLonInMeters(
                     depotCoordinates[1],
                     depotCoordinates[0],
@@ -2037,7 +1849,7 @@
                     btn.addEventListener('click', () => {
                         if (item.longitude && item.latitude) {
                             map.flyTo({ center: [item.longitude, item.latitude] });
-                            const marker = isBeacon ? beaconMarkers[item.id] : markers[item.deviceId];
+                            const marker = markers[item.deviceId];
                             if (marker) {
                                 openPopup(marker.getPopup());
                             }
@@ -2054,15 +1866,10 @@
                     addDepotListItem(t);
                 }
             });
-            Object.values(beacons).forEach(b => {
-                if (typeof b.latitude === 'number' && typeof b.longitude === 'number') {
-                    addDepotListItem(b, true);
-                }
-            });
 
             if (depotList.children.length === 0) {
                 const li = document.createElement('li');
-                li.textContent = "Aucun tracker ni beacon dans un rayon de 200m.";
+                li.textContent = "Aucun tracker dans un rayon de 200m.";
                 depotList.appendChild(li);
             }
         }
@@ -2085,7 +1892,6 @@
                 }
             });
             map.on('style.load', () => {
-                Object.values(beaconMarkers).forEach(m => m.addTo(map));
                 Object.values(markers).forEach(m => m.addTo(map));
                 displayGeofences();
             });
@@ -2235,7 +2041,7 @@
                 timelineData = data.map(p => ({
                     time: new Date(p.deviceTime),
                     coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)],
-                    motion: p.attributes?.motion === true 
+                    motion: p.attributes?.motion === true
                 }));
                 addRouteToMap(coords);
                 initializeTimeline();
@@ -2258,17 +2064,16 @@
                 }
                 const val = document.getElementById('tracker-select').value;
                 if (!val) {
-                    alert("Sélectionner un tracker ou un beacon.");
+                    alert("Sélectionner un device.");
                     return;
                 }
                 const idx = val.indexOf('-');
                 let type = val.substring(0, idx);
                 let id = val.substring(idx + 1);
+                // plus de beacons => juste un tracker
                 if (type === 'tracker') {
                     const selectedDate = routeDateInput.value; 
                     fetchAndDisplayRoute(id, selectedDate);
-                } else {
-                    alert("La fonctionnalité de route n'est pas dispo pour les beacons.");
                 }
             });
             routeDateInput.addEventListener('change', () => {
@@ -2367,7 +2172,6 @@
             document.getElementById('current-time').textContent = '00:00:00';
             document.documentElement.style.setProperty('--timeline-gradient', '#ccc');
         }
-
         function formatTime(date) {
             const h = String(date.getHours()).padStart(2, '0');
             const m = String(date.getMinutes()).padStart(2, '0');
@@ -2376,79 +2180,62 @@
         }
 
         function initializeMap() {
-            // On récupère le JSON des beacons
-            fetch('https://raw.githubusercontent.com/ludobetris/spotit-app/master/beacons.json')
-                .then(r => {
-                    if (!r.ok) throw new Error("Erreur beacons.json");
-                    return r.json();
-                })
-                .then(data => {
-                    beaconDefinitions = data;
-                    mapboxgl.accessToken = MAPBOX_API_KEY;
-                    map = new mapboxgl.Map({
-                        container: 'map',
-                        style: 'mapbox://styles/mapbox/streets-v11',
-                        center: [7.475422, 46.257917],
-                        zoom: 14
-                    });
-                    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+            // On ne charge plus de beacons.json
+            mapboxgl.accessToken = MAPBOX_API_KEY;
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [7.475422, 46.257917],
+                zoom: 14
+            });
+            map.addControl(new mapboxgl.NavigationControl(), 'top-right');
                     
-                    map.on('load', () => {
-                        getTrackersData();
-                        updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
-                        // Géolocalisation continue
-                        if (navigator.geolocation) {
-                            watchPositionId = navigator.geolocation.watchPosition(
-                                pos => {
-                                    const { latitude, longitude } = pos.coords;
-                                    if (!myLocationMarker) {
-                                        // On crée un marqueur "cercle bleu"
-                                        const el = document.createElement('div');
-                                        el.style.width = '20px';
-                                        el.style.height = '20px';
-                                        el.style.borderRadius = '50%';
-                                        el.style.backgroundColor = 'blue';
-                                        el.style.boxShadow = '0 0 10px 2px rgba(0,0,255,0.5)';
-                                        myLocationMarker = new mapboxgl.Marker({ element: el })
-                                            .setLngLat([longitude, latitude])
-                                            .addTo(map);
-                                    } else {
-                                        myLocationMarker.setLngLat([longitude, latitude]);
-                                    }
-                                },
-                                err => {
-                                    console.warn("Géolocalisation refusée:", err);
-                                },
-                                { enableHighAccuracy: true }
-                            );
-                        }
-                    });
+            map.on('load', () => {
+                getTrackersData();
+                updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
+                // Géolocalisation continue
+                if (navigator.geolocation) {
+                    watchPositionId = navigator.geolocation.watchPosition(
+                        pos => {
+                            const { latitude, longitude } = pos.coords;
+                            if (!myLocationMarker) {
+                                const el = document.createElement('div');
+                                el.style.width = '20px';
+                                el.style.height = '20px';
+                                el.style.borderRadius = '50%';
+                                el.style.backgroundColor = 'blue';
+                                el.style.boxShadow = '0 0 10px 2px rgba(0,0,255,0.5)';
+                                myLocationMarker = new mapboxgl.Marker({ element: el })
+                                    .setLngLat([longitude, latitude])
+                                    .addTo(map);
+                            } else {
+                                myLocationMarker.setLngLat([longitude, latitude]);
+                            }
+                        },
+                        err => {
+                            console.warn("Géolocalisation refusée:", err);
+                        },
+                        { enableHighAccuracy: true }
+                    );
+                }
+            });
 
-                    setupMapClickListener();
-                    setupToggleButtons();
-                    setupMapSwitch();
-                    setupSearch();
-                    setupRouteButton();
+            setupMapClickListener();
+            setupToggleButtons();
+            setupMapSwitch();
+            setupSearch();
+            setupRouteButton();
 
-                    // Boutons de fermeture modals
-                    document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
-                    document.getElementById('engine-modal-close').addEventListener('click', closeEngineModal);
+            document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
+            document.getElementById('engine-modal-close').addEventListener('click', closeEngineModal);
+            document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
+            document.getElementById('export-engine-button').addEventListener('click', exportEngineDataToExcel);
+            document.getElementById('battery-calc-button').addEventListener('click', loadBatteryDataForRange);
 
-                    // Boutons de calcul / export
-                    document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
-                    document.getElementById('export-engine-button').addEventListener('click', exportEngineDataToExcel);
-                    document.getElementById('battery-calc-button').addEventListener('click', loadBatteryDataForRange);
-
-                    // On rend visible les éléments cachés
-                    document.getElementById('search-container').style.display = 'flex';
-                    document.getElementById('toggle-controls').style.display = 'flex';
-                    document.getElementById('toggle-depot').style.display = 'flex';
-                    document.getElementById('map-switch-container').style.display = 'flex';
-                })
-                .catch(err => {
-                    console.error("Erreur beacons:", err);
-                    alert("Erreur lors du chargement des beacons.");
-                });
+            document.getElementById('search-container').style.display = 'flex';
+            document.getElementById('toggle-controls').style.display = 'flex';
+            document.getElementById('toggle-depot').style.display = 'flex';
+            document.getElementById('map-switch-container').style.display = 'flex';
         }
 
         function stopUpdatingPositions() {
