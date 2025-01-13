@@ -737,7 +737,9 @@
         let myLocationMarker = null;
         let watchPositionId = null;
 
-        // UTILITAIRE : Distance
+        // ********** FONCTIONS UTILITAIRES **********
+
+        // Distance
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -1067,7 +1069,7 @@
             return trips;
         }
 
-        // GRAPHIQUE BATTERIE
+        // ********** GESTION DU GRAPHIQUE BATTERIE **********
         function showVoltageChart(deviceId) {
             currentBatteryDeviceId = deviceId;
             const modal = document.getElementById('battery-modal');
@@ -1312,7 +1314,7 @@
             });
         }
 
-        // ENGINE MODAL
+        // ********** GESTION DU MOTEUR **********
         function showEngineModal(deviceId, defaultHours = 0) {
             currentEngineDeviceId = deviceId;
             const modal = document.getElementById('engine-modal');
@@ -1496,7 +1498,46 @@
             document.body.removeChild(link);
         }
 
-        // RÉCUPÉRATION TRACKERS
+        // ********** FONCTIONS D’AFFICHAGE DU BEACON (PRÉCISION) **********
+        // Ajout/suppression du cercle de précision autour d'un beacon
+        function addAccuracyCircle(deviceId, coordinates, radiusM) {
+            const sourceId = "accuracy-circle-" + deviceId;
+            const layerId = sourceId + "-layer";
+            removeAccuracyCircle(deviceId);
+            const circle = approximateCircle(coordinates[1], coordinates[0], radiusM, 32);
+
+            map.addSource(sourceId, {
+                type: "geojson",
+                data: {
+                    type: "Feature",
+                    geometry: {
+                        type: "Polygon",
+                        coordinates: [circle],
+                    }
+                }
+            });
+            map.addLayer({
+                id: layerId,
+                type: "fill",
+                source: sourceId,
+                paint: {
+                    "fill-color": "#0000ff",
+                    "fill-opacity": 0.2
+                }
+            });
+        }
+        function removeAccuracyCircle(deviceId) {
+            const sourceId = "accuracy-circle-" + deviceId;
+            const layerId = sourceId + "-layer";
+            if (map.getLayer(layerId)) {
+                map.removeLayer(layerId);
+            }
+            if (map.getSource(sourceId)) {
+                map.removeSource(sourceId);
+            }
+        }
+
+        // ********** RÉCUPÉRATION DES TRACKERS **********
         async function getTrackersData() {
             try {
                 // 1) devices
@@ -1543,10 +1584,6 @@
                     geofences = await geofencesResp.json();
                 }
 
-                // On ne re-coche plus systématiquement les groupes à chaque refresh.
-                // On se contente de les collecter et de rafraîchir la carte.
-                // => Les groupes décochés restent décochés.
-
                 const now = new Date();
                 const dateTo = now.toISOString();
                 const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString(); 
@@ -1555,8 +1592,15 @@
                 // On boucle sur chaque device
                 for (const dev of devicesData) {
                     const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
+
+                    // Récupération du booléen "isbeacon" dans les attributs du device
+                    let isBeacon = false;
+                    if (dev.attributes && dev.attributes.isbeacon === true) {
+                        isBeacon = true;
+                    }
+
+                    // On récupère les positions
                     const positionsUrl = `https://xf5655945.traccar.com/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
-                    
                     const positionsResp = await fetch(positionsUrl, {
                         method: 'GET',
                         headers: {
@@ -1579,7 +1623,9 @@
                             hasPositions: false,
                             avgVoltage: null,
                             engineHoursToday: 0,
-                            lastConnectionTime: null
+                            lastConnectionTime: null,
+                            isBeacon: isBeacon,
+                            accuracy: 0
                         });
                         continue;
                     }
@@ -1605,7 +1651,14 @@
                         avgV = Math.round(avgV * 100) / 100;
                     }
 
-                    const engineHoursToday = calculateEngineHours(positionsData);
+                    // Si "isbeacon", on stocke l'accuracy dans l'objet
+                    let accuracyVal = parseFloat(lastPos.accuracy || 0);
+
+                    // Heures moteur (uniquement si pas beacon)
+                    let engineHoursToday = 0;
+                    if (!isBeacon) {
+                        engineHoursToday = calculateEngineHours(positionsData);
+                    }
 
                     finalDevices.push({
                         deviceId: dev.id,
@@ -1616,7 +1669,9 @@
                         hasPositions: true,
                         avgVoltage: avgV,
                         engineHoursToday: engineHoursToday,
-                        lastConnectionTime: lastPos.deviceTime
+                        lastConnectionTime: lastPos.deviceTime,
+                        isBeacon: isBeacon,
+                        accuracy: accuracyVal
                     });
                 }
                 trackers = finalDevices;
@@ -1641,21 +1696,19 @@
                 ...new Set(trackers.map(t => t.group))
             ].sort();
 
-            // Pour chaque groupe, on crée la case à cocher.
+            // Si c'est le premier chargement (checkedGroupsSet est vide), on coche tout
+            if (checkedGroupsSet.size === 0) {
+                uniqueGroups.forEach(g => checkedGroupsSet.add(g));
+            }
+
+            // Pour chaque groupe, on crée la case à cocher
             uniqueGroups.forEach(groupe => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.classList.add('group-checkbox');
                 checkbox.dataset.groupe = groupe;
-                // Coche si le set l'a déjà, sinon (si première fois) on le coche par défaut
-                if (checkedGroupsSet.has(groupe) || checkedGroupsSet.size === 0) {
-                    // Évite de forcer tout le monde => on vérifie si le set est vide.
-                    // Si c'est vide, on coche par défaut. Sinon on respecte ce qu'il y a.
-                    if (checkedGroupsSet.has(groupe) || checkedGroupsSet.size === 0) {
-                        checkedGroupsSet.add(groupe);
-                        checkbox.checked = true;
-                    }
-                }
+                // On coche si le groupe est présent dans le set
+                checkbox.checked = checkedGroupsSet.has(groupe);
 
                 checkbox.addEventListener('change', (event) => {
                     if (event.target.checked) {
@@ -1678,7 +1731,7 @@
             const currentValue = trackerSelect.value;
             trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
 
-            // On n'ajoute que les trackers (les beacons sont supprimés du code)
+            // On n'ajoute que les trackers + beacons, on les différencie juste par un flag interne
             const combinedList = trackers.map(t => ({
                 type: 'tracker',
                 id: t.deviceId,
@@ -1709,7 +1762,6 @@
                 type = val.substring(0, idx);
                 id = val.substring(idx + 1);
             }
-            // On ne gère plus les beacons => toujours type=tracker
             const selected = trackers.find(t => String(t.deviceId) === String(id));
             if (selected && typeof selected.latitude === 'number' && typeof selected.longitude === 'number') {
                 map.flyTo({ center: [selected.longitude, selected.latitude], zoom: map.getZoom() });
@@ -1728,12 +1780,13 @@
             currentPopup.addTo(map);
         }
 
+        // Mise à jour de la carte (marqueurs) en fonction des groupes cochés
         function updateMap() {
             if (!map) return;
             const checkedGroups = Array.from(checkedGroupsSet);
             const visibleTrackerIds = [];
 
-            // Affiche uniquement les trackers des groupes cochés
+            // Affiche uniquement les trackers/beacons des groupes cochés
             trackers.forEach(t => {
                 if (!t.hasPositions) return;
                 if (!checkedGroups.includes(t.group)) return;
@@ -1742,7 +1795,9 @@
 
                 let marker = markers[t.deviceId];
                 if (!marker) {
+                    // Création du marker
                     let el;
+                    // Choix d’icône en fonction du groupe (exemple existant)
                     if (t.group.toLowerCase() === 'pickups') {
                         el = document.createElement('img');
                         el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
@@ -1769,35 +1824,64 @@
                         el.style.width = '50px';
                         el.style.height = '50px';
                     } else {
+                        // Pour les autres groupes
                         el = document.createElement('div');
                         el.style.width = '20px';
                         el.style.height = '20px';
                         el.style.borderRadius = '50%';
                         el.style.backgroundColor = 'orange';
                     }
+
+                    // Construction du popup
                     let popupHTML = `<strong>Nom:</strong> ${t.name}`;
-                    if (t.avgVoltage !== null) {
-                        const iconUrl = getBatteryIcon(t.avgVoltage);
-                        const explanation = getBatteryTooltip(t.avgVoltage);
-                        popupHTML += `<br/><strong>Batterie:</strong>
-                            <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
-                            <a href="#" onclick="showVoltageChart(${t.deviceId}); return false;"
-                               title="${explanation}"
-                               style="color:blue; text-decoration:underline;">
-                                ${t.avgVoltage} V
-                            </a>`;
+
+                    // Si c’est un beacon, on n’affiche pas les heures moteur
+                    if (t.isBeacon) {
+                        // Affiche la tension (si présente) ?
+                        if (t.avgVoltage !== null) {
+                            const iconUrl = getBatteryIcon(t.avgVoltage);
+                            const explanation = getBatteryTooltip(t.avgVoltage);
+                            popupHTML += `<br/><strong>Batterie:</strong>
+                                <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
+                                <span title="${explanation}"
+                                      style="color:blue; text-decoration:underline;">
+                                    ${t.avgVoltage} V
+                                </span>`;
+                        }
+                        // Affiche la précision
+                        popupHTML += `<br/><strong>Précision:</strong> ±${t.accuracy} m`;
+                        if (t.accuracy > 20) {
+                            popupHTML += `<br/><span style="color:red;">Position approximative !</span>`;
+                        }
+                    } else {
+                        // Tracker normal => on affiche la batterie et les heures moteur
+                        if (t.avgVoltage !== null) {
+                            const iconUrl = getBatteryIcon(t.avgVoltage);
+                            const explanation = getBatteryTooltip(t.avgVoltage);
+                            popupHTML += `<br/><strong>Batterie:</strong>
+                                <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
+                                <a href="#" onclick="showVoltageChart(${t.deviceId}); return false;"
+                                   title="${explanation}"
+                                   style="color:blue; text-decoration:underline;">
+                                    ${t.avgVoltage} V
+                                </a>`;
+                        }
+                        // Heures moteur
+                        if (t.engineHoursToday !== undefined) {
+                            popupHTML += `<br/><strong>h moteur:</strong>
+                                <a href="#" style="color:blue; text-decoration:underline;"
+                                   onclick="showEngineModal(${t.deviceId}, ${t.engineHoursToday}); return false;">
+                                    ${t.engineHoursToday.toFixed(2)} h
+                                </a>`;
+                        }
                     }
-                    if (t.engineHoursToday !== undefined) {
-                        popupHTML += `<br/><strong>h moteur:</strong>
-                            <a href="#" style="color:blue; text-decoration:underline;"
-                               onclick="showEngineModal(${t.deviceId}, ${t.engineHoursToday}); return false;">
-                                ${t.engineHoursToday.toFixed(2)} h
-                            </a>`;
-                    }
+
+                    // Dernière connexion
                     const lastConnLabel = getLastConnectionLabel(t.lastConnectionTime);
                     if (lastConnLabel) {
                         popupHTML += `<br/><strong>Dernière connexion :</strong> ${lastConnLabel}`;
                     }
+
                     const popup = new mapboxgl.Popup({
                         closeButton: false,
                         offset: 25
@@ -1807,14 +1891,29 @@
                         .setLngLat([t.longitude, t.latitude])
                         .setPopup(popup);
 
+                    // Au clic sur le marker
                     marker.getElement().addEventListener('click', () => {
                         const trackerSelect = document.getElementById('tracker-select');
                         trackerSelect.value = `tracker-${t.deviceId}`;
                         trackerSelect.dispatchEvent(new Event('change'));
+
+                        // Si c'est un beacon, on affiche le cercle de précision
+                        if (t.isBeacon && t.accuracy > 0) {
+                            addAccuracyCircle(t.deviceId, [t.longitude, t.latitude], t.accuracy);
+                        }
                     });
+
+                    // Quand le popup se ferme, on enlève le cercle de précision si c'était un beacon
+                    popup.on('close', () => {
+                        if (t.isBeacon) {
+                            removeAccuracyCircle(t.deviceId);
+                        }
+                    });
+
                     marker.addTo(map);
                     markers[t.deviceId] = marker;
                 } else {
+                    // Marker déjà existant => on met à jour la position
                     marker.setLngLat([t.longitude, t.latitude]);
                 }
             });
@@ -1874,6 +1973,7 @@
             }
         }
 
+        // ********** BOUTONS ET CONTRÔLES **********
         function setupToggleButtons() {
             document.getElementById('toggle-controls').addEventListener('click', () => {
                 document.getElementById('controls-container').classList.toggle('active');
@@ -1992,6 +2092,7 @@
             });
         }
 
+        // ********** GESTION DE LA ROUTE + TIMELINE **********
         function createTimelineGradient(data) {
             if (!data || data.length < 2) {
                 return '#ccc';
@@ -2070,7 +2171,6 @@
                 const idx = val.indexOf('-');
                 let type = val.substring(0, idx);
                 let id = val.substring(idx + 1);
-                // plus de beacons => juste un tracker
                 if (type === 'tracker') {
                     const selectedDate = routeDateInput.value; 
                     fetchAndDisplayRoute(id, selectedDate);
@@ -2179,8 +2279,8 @@
             return `${h}:${m}:${s}`;
         }
 
+        // ********** INITIALISATION **********
         function initializeMap() {
-            // On ne charge plus de beacons.json
             mapboxgl.accessToken = MAPBOX_API_KEY;
             map = new mapboxgl.Map({
                 container: 'map',
@@ -2253,6 +2353,7 @@
             stopUpdatingPositions();
         });
 
+        // ********** FORMULAIRE DE CONNEXION **********
         document.getElementById('credentials-form').addEventListener('submit', (event) => {
             event.preventDefault();
             const mapboxKeyInput = document.getElementById('mapbox-key').value.trim();
