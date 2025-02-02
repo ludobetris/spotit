@@ -1,2389 +1,1676 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Carte Mapbox avec Trackers Traccar</title>
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <!-- Chart.js pour tracer un graphique + adaptateur temps -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
-    <!-- Plugin pour les lignes d’annotation -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Carte Mapbox avec Trackers Traccar</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <!-- Chart.js pour tracer un graphique + adaptateur temps -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
+  <!-- Plugin pour les lignes d’annotation -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.1.0"></script>
 
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            font-family: Arial, sans-serif;
-            overflow: hidden; /* Empêche tout scrolling ou « dézoom » qui révélerait le menu */
-        }
+  <style>
+    /* Styles généraux */
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #map {
+      width: 100%;
+      height: -webkit-fill-available;
+      height: 100vh;
+    }
 
-        #map {
-            width: 100%;
-            height: -webkit-fill-available; /* Permet de remplir l'espace dispo sur Safari iOS */
-            height: 100vh;                 /* S’applique sur la plupart des autres navigateurs */
-        }
-
-        /* Panneaux de contrôle */
-        #controls-container, #depot-container {
-            position: fixed;        
-            top: 0;
-            bottom: 0;
-            width: 250px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            background: rgba(240, 240, 240, 0.95);
-            box-shadow: 2px 0 5px rgba(0,0,0,0.3);
-            padding: 20px;
-            box-sizing: border-box;
-            transition: transform 0.3s ease;
-            z-index: 21;
-            overflow-y: auto;
-        }
-        #controls-container {
-            left: 0;
-            transform: translateX(-100%);
-        }
-        #depot-container {
-            right: 0;
-            transform: translateX(100%);
-        }
-        #controls-container.active {
-            transform: translateX(0);
-        }
-        #depot-container.active {
-            transform: translateX(0);
-        }
-
-        #controls-container h2, #depot-container h2 {
-            margin-top: 70px;
-            margin-bottom: 10px;
-            font-size: 1.2em;
-            flex-shrink: 0;
-        }
-
-        #controls-content, #depot-content {
-            flex-grow: 1;
-        }
-
-        .group-checkbox {
-            margin-bottom: 10px;
-            overflow-y: auto;
-        }
-        .group-checkbox label {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-            cursor: pointer;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            background: #fff;
-        }
-        .group-checkbox input[type="checkbox"] {
-            margin-right: 10px;
-            cursor: pointer;
-        }
-
-        .toggle-button {
-            position: absolute;
-            top: 20px;
-            width: 40px;
-            height: 40px;
-            background: #ffffff;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            cursor: pointer;
-            z-index: 22;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-            font-size: 20px;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        #toggle-controls {
-            left: 20px;
-        }
-        #toggle-depot {
-            right: 20px;
-        }
-
-        #depot-content ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        #depot-content li {
-            margin-bottom: 10px;
-            padding: 5px;
-            border-bottom: 1px solid #ccc;
-        }
-        #depot-content li:last-child {
-            border-bottom: none;
-        }
-        #depot-content button {
-            background: none;
-            border: none;
-            padding: 0;
-            font: inherit;
-            color: #007bff;
-            cursor: pointer;
-            text-align: left;
-            width: 100%;
-        }
-        #depot-content button:hover {
-            text-decoration: underline;
-        }
-
-        #map-switch-container {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 5px;
-            border-radius: 5px;
-            z-index: 20;
-            display: flex;
-            align-items: center;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-        }
-        #map-switch {
-            margin-left: 5px;
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-        }
-
-        .mapboxgl-ctrl-top-right {
-            top: 25%;
-        }
-
-        #search-container {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 5px 10px;
-            border-radius: 5px;
-            z-index: 20;
-            display: flex;
-            align-items: center;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-        }
-        .search-bar {
-            position: relative;
-            display: flex;
-            width: 100%;
-            max-width: 400px;
-        }
-        #search-input {
-            width: 200px;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-        }
-        #search-button {
-            margin-left: 5px;
-            padding: 5px 10px;
-            border: none;
-            background: #007bff;
-            color: #fff;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        #search-button:hover {
-            background: #0056b3;
-        }
-
-        #suggestions-list {
-            list-style: none;
-            padding: 0;
-            margin-top: 5px;
-            background: #fff;
-            border: 1px solid #ccc;
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
-            max-height: 150px;
-            overflow-y: auto;
-            z-index: 30;
-        }
-        #suggestions-list li {
-            padding: 5px;
-            cursor: pointer;
-        }
-        #suggestions-list li:hover {
-            background-color: #f0f0f0;
-        }
-
-        #tracker-select {
-            margin-left: 10px;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            font-size: 16px;
-            width: 100%;
-        }
-        #route-button {
-            margin-left: 10px;
-            padding: 5px 10px;
-            border: none;
-            background: #28a745;
-            color: #fff;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        #route-button:hover {
-            background: #1e7e34;
-        }
-
-        #group-list, #depot-list {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        #timeline-container {
-            position: absolute;
-            bottom: 60px;
-            left: 0;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            box-sizing: border-box;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
-            z-index: 20;
-        }
-        #timeline {
-            width: 60%;
-            margin-left: 10px;
-            margin-right: 10px;
-        }
-        #current-time {
-            margin-left: 10px;
-            font-weight: bold;
-        }
-        .timeline-marker {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: yellow;
-            border: 2px solid red;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-        }
-
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: none; 
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-        .modal-content {
-            background: #fff;
-            width: 100%;
-            height: 100%;
-            border-radius: 0;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-            overflow-y: auto;
-            position: relative;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        .modal-close-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #bbb;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-        .modal-close-btn:hover {
-            background: #999;
-        }
-        .modal-content h2,
-        .modal-content h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-
-        #battery-modal-content canvas,
-        #engine-modal-content canvas {
-            width: 100%;
-            height: 300px;
-        }
-
-        #credentials-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-        #credentials-form {
-            background: #fff;
-            padding: 20px;
-            border-radius: 5px;
-            width: 300px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        #credentials-form h2 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-        #credentials-form label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        #credentials-form input {
-            width: 94%;
-            padding: 8px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-        }
-        #credentials-form button {
-            width: 100%;
-            padding: 10px;
-            background: #007bff;
-            border: none;
-            color: #fff;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        #credentials-form button:hover {
-            background: #0056b3;
-        }
-
-        #timeline {
-            -webkit-appearance: none;
-            appearance: none;
-            background: #ccc; 
-            height: 8px;
-            border-radius: 5px;
-            outline: none;
-        }
-        #timeline::-webkit-slider-runnable-track {
-            height: 8px;
-            border-radius: 5px;
-            background: var(--timeline-gradient, #ccc);
-        }
-        #timeline::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #007bff;
-            cursor: pointer;
-            margin-top: -5px; 
-        }
-        #timeline::-moz-range-track {
-            height: 8px;
-            border-radius: 5px;
-            background: var(--timeline-gradient, #ccc);
-        }
-        #timeline::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #007bff;
-            cursor: pointer;
-        }
-
-        @media (max-width: 768px) {
-            #controls-container, #depot-container {
-                width: 80%;
-            }
-            #controls-container {
-                top: 0;
-                left: 0;
-                transform: translateX(-100%);
-            }
-            #depot-container {
-                top: 0;
-                right: 0;
-                transform: translateX(100%);
-            }
-            #controls-container h2, #depot-container h2 {
-                margin-top: 20px;
-                font-size: 1em;
-            }
-            #search-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            #search-input {
-                width: 100%;
-                margin-bottom: 10px;
-            }
-            #tracker-select, #route-button {
-                width: 100%;
-                margin-left: 0;
-                margin-bottom: 10px;
-            }
-            .toggle-button {
-                width: 35px;
-                height: 35px;
-                font-size: 18px;
-            }
-            #timeline-container {
-                width: 100%;
-            }
-            .mapboxgl-ctrl-top-right {
-                top: auto;
-                bottom: 20%;
-            }
-        }
-
-        @media (max-width: 480px) {
-            #controls-container, #depot-container {
-                width: 50%;
-            }
-            #controls-container {
-                top: 80px;
-                left: 0;
-                transform: translateX(-100%);
-            }
-            #depot-container {
-                top: 80px;
-                right: 0;
-                transform: translateX(100%);
-            }
-            #controls-container h2, #depot-container h2 {
-                font-size: 1em;
-            }
-            #controls-container, #depot-container {
-                padding: 15px;
-            }
-            #search-button, #route-button, .toggle-button {
-                font-size: 16px;
-                padding: 10px;
-            }
-            #timeline {
-                width: 90%;
-            }
-            .timeline-marker {
-                width: 10px;
-                height: 10px;
-            }
-            .search-bar {
-                max-width: 100%;
-            }
-        }
-
-        label, button, select {
-            min-height: 40px;
-            padding: 10px;
-        }
-
-        #controls-content, #depot-content, #search-container {
-            margin-bottom: 10px;
-        }
-
-        #engine-trips-table {
-            margin: 20px auto;
-            border-collapse: collapse;
-            width: 95%;
-            max-width: 800px;
-        }
-        #engine-trips-table th, #engine-trips-table td {
-            border: 1px solid #ccc;
-            padding: 8px;
-            text-align: center;
-        }
-        #engine-trips-table th {
-            background-color: #f5f5f5;
-        }
-        #export-engine-button {
-            margin: 10px auto;
-            display: block;
-            background: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 3px;
-            padding: 10px;
-            cursor: pointer;
-        }
-        #export-engine-button:hover {
-            background: #0056b3;
-        }
-
-        #engine-modal-content .engine-controls {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 30px;
-        }
-        #engine-modal-content .engine-controls label {
-            display: flex;
-            align-items: flex-end;
-            margin: 0;
-            padding: 0;
-            height: 20px;
-            text-align: center;
-        }
-        #engine-modal-content .engine-controls input,
-        #engine-modal-content .engine-controls button {
-            display: block;
-            margin: 8px auto;
-            text-align: center;
-        }
-    </style>
+    /* Panneaux de contrôle */
+    #controls-container, #depot-container {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 250px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: rgba(240, 240, 240, 0.95);
+      box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+      padding: 20px;
+      box-sizing: border-box;
+      transition: transform 0.3s ease;
+      z-index: 21;
+      overflow-y: auto;
+    }
+    #controls-container { left: 0; transform: translateX(-100%); }
+    #depot-container { right: 0; transform: translateX(100%); }
+    #controls-container.active { transform: translateX(0); }
+    #depot-container.active { transform: translateX(0); }
+    #controls-container h2, #depot-container h2 {
+      margin-top: 70px;
+      margin-bottom: 10px;
+      font-size: 1.2em;
+      flex-shrink: 0;
+    }
+    #controls-content, #depot-content { flex-grow: 1; }
+    .group-checkbox {
+      margin-bottom: 10px;
+      overflow-y: auto;
+    }
+    .group-checkbox label {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+      cursor: pointer;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background: #fff;
+    }
+    .group-checkbox input[type="checkbox"] {
+      margin-right: 10px;
+      cursor: pointer;
+    }
+    .toggle-button {
+      position: absolute;
+      top: 20px;
+      width: 40px;
+      height: 40px;
+      background: #ffffff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 22;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+      font-size: 20px;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #toggle-controls { left: 20px; }
+    #toggle-depot { right: 20px; }
+    #depot-content ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    #depot-content li {
+      margin-bottom: 10px;
+      padding: 5px;
+      border-bottom: 1px solid #ccc;
+    }
+    #depot-content li:last-child { border-bottom: none; }
+    #depot-content button {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: #007bff;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+    }
+    #depot-content button:hover { text-decoration: underline; }
+    #map-switch-container {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 5px;
+      border-radius: 5px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    }
+    #map-switch {
+      margin-left: 5px;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    .mapboxgl-ctrl-top-right { top: 25%; }
+    #search-container {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 5px 10px;
+      border-radius: 5px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    }
+    .search-bar {
+      position: relative;
+      display: flex;
+      width: 100%;
+      max-width: 400px;
+    }
+    #search-input {
+      width: 200px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    #search-button {
+      margin-left: 5px;
+      padding: 5px 10px;
+      border: none;
+      background: #007bff;
+      color: #fff;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #search-button:hover { background: #0056b3; }
+    #suggestions-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 5px;
+      background: #fff;
+      border: 1px solid #ccc;
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      width: 100%;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 30;
+    }
+    #suggestions-list li {
+      padding: 5px;
+      cursor: pointer;
+    }
+    #suggestions-list li:hover { background-color: #f0f0f0; }
+    /* Select pour devices (aucune icône) */
+    #tracker-select {
+      margin-left: 10px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 16px;
+      width: 100%;
+    }
+    #route-button {
+      margin-left: 10px;
+      padding: 5px 10px;
+      border: none;
+      background: #28a745;
+      color: #fff;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #route-button:hover { background: #1e7e34; }
+    #group-list, #depot-list {
+      display: flex;
+      flex-direction: column;
+    }
+    #timeline-container {
+      position: absolute;
+      bottom: 60px;
+      left: 0;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      box-sizing: border-box;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
+      z-index: 20;
+    }
+    #timeline {
+      width: 60%;
+      margin-left: 10px;
+      margin-right: 10px;
+    }
+    #current-time {
+      margin-left: 10px;
+      font-weight: bold;
+    }
+    .timeline-marker {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: yellow;
+      border: 2px solid red;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-content {
+      background: #fff;
+      width: 100%;
+      height: 100%;
+      border-radius: 0;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .modal-close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #bbb;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .modal-close-btn:hover { background: #999; }
+    .modal-content h2, .modal-content h3 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    #battery-modal-content canvas,
+    #engine-modal-content canvas {
+      width: 100%;
+      height: 300px;
+    }
+    /* Formulaire de connexion (clé Mapbox intégrée) */
+    #credentials-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    #credentials-form {
+      background: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      width: 300px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    #credentials-form h2 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    #credentials-form label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    #credentials-form input {
+      width: 94%;
+      padding: 8px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    #credentials-form button {
+      width: 100%;
+      padding: 10px;
+      background: #007bff;
+      border: none;
+      color: #fff;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #credentials-form button:hover { background: #0056b3; }
+    #timeline {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #ccc;
+      height: 8px;
+      border-radius: 5px;
+      outline: none;
+    }
+    #timeline::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 5px;
+      background: var(--timeline-gradient, #ccc);
+    }
+    #timeline::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #007bff;
+      cursor: pointer;
+      margin-top: -5px;
+    }
+    #timeline::-moz-range-track {
+      height: 8px;
+      border-radius: 5px;
+      background: var(--timeline-gradient, #ccc);
+    }
+    #timeline::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #007bff;
+      cursor: pointer;
+    }
+    @media (max-width: 768px) {
+      #controls-container, #depot-container { width: 80%; }
+      #controls-container { top: 0; left: 0; transform: translateX(-100%); }
+      #depot-container { top: 0; right: 0; transform: translateX(100%); }
+      #controls-container h2, #depot-container h2 { margin-top: 20px; font-size: 1em; }
+      #search-container { flex-direction: column; align-items: stretch; }
+      #search-input { width: 100%; margin-bottom: 10px; }
+      #tracker-select, #route-button { width: 100%; margin-left: 0; margin-bottom: 10px; }
+      .toggle-button { width: 35px; height: 35px; font-size: 18px; }
+      #timeline-container { width: 100%; }
+      .mapboxgl-ctrl-top-right { top: auto; bottom: 20%; }
+    }
+    @media (max-width: 480px) {
+      #controls-container, #depot-container { width: 50%; }
+      #controls-container { top: 80px; left: 0; transform: translateX(-100%); }
+      #depot-container { top: 80px; right: 0; transform: translateX(100%); }
+      #controls-container h2, #depot-container h2 { font-size: 1em; }
+      #controls-container, #depot-container { padding: 15px; }
+      #search-button, #route-button, .toggle-button { font-size: 16px; padding: 10px; }
+      #timeline { width: 90%; }
+      .timeline-marker { width: 10px; height: 10px; }
+      .search-bar { max-width: 100%; }
+    }
+    label, button, select { min-height: 40px; padding: 10px; }
+    #controls-content, #depot-content, #search-container { margin-bottom: 10px; }
+    #engine-trips-table {
+      margin: 20px auto;
+      border-collapse: collapse;
+      width: 95%;
+      max-width: 800px;
+    }
+    #engine-trips-table th, #engine-trips-table td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    #engine-trips-table th { background-color: #f5f5f5; }
+    #export-engine-button {
+      margin: 10px auto;
+      display: block;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      padding: 10px;
+      cursor: pointer;
+    }
+    #export-engine-button:hover { background: #0056b3; }
+    #engine-modal-content .engine-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 30px;
+    }
+    #engine-modal-content .engine-controls label {
+      display: flex;
+      align-items: flex-end;
+      margin: 0;
+      padding: 0;
+      height: 20px;
+      text-align: center;
+    }
+    #engine-modal-content .engine-controls input,
+    #engine-modal-content .engine-controls button {
+      display: block;
+      margin: 8px auto;
+      text-align: center;
+    }
+    /* Overlay de chargement (masqué par défaut) */
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255,255,255,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .spinner {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #3498db;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-    <!-- Modal pour saisir les identifiants (page de connexion) -->
-    <div id="credentials-modal">
-        <form id="credentials-form">
-            <h2>Connexion</h2>
-            <label for="mapbox-key">Clé API Mapbox :</label>
-            <input type="text" id="mapbox-key" required placeholder="Entrez votre clé API Mapbox">
-            
-            <label for="traccar-username">Nom d'utilisateur Traccar :</label>
-            <input type="text" id="traccar-username" required placeholder="Entrez votre nom d'utilisateur">
-            
-            <label for="traccar-password">Mot de passe Traccar :</label>
-            <input type="password" id="traccar-password" required placeholder="Entrez votre mot de passe">
-            
-            <button type="submit">Se Connecter</button>
-        </form>
+  <!-- Overlay de chargement (initialement masqué) -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Modal de connexion -->
+  <div id="credentials-modal">
+    <form id="credentials-form">
+      <h2>Connexion</h2>
+      <label for="traccar-username">Nom d'utilisateur Traccar :</label>
+      <input type="text" id="traccar-username" required placeholder="Entrez votre nom d'utilisateur">
+      <label for="traccar-password">Mot de passe Traccar :</label>
+      <input type="password" id="traccar-password" required placeholder="Entrez votre mot de passe">
+      <button type="submit">Se Connecter</button>
+    </form>
+  </div>
+
+  <!-- Modal pour l'affichage du graphique de tension (sans graphique moteur superposé) -->
+  <div id="battery-modal" class="modal-overlay">
+    <div id="battery-modal-content" class="modal-content">
+      <button id="battery-modal-close" class="modal-close-btn">Fermer</button>
+      <h3>Historique de tension</h3>
+      <div class="engine-controls">
+        <label for="battery-start">Début :</label>
+        <input type="datetime-local" id="battery-start">
+        <label for="battery-end">Fin :</label>
+        <input type="datetime-local" id="battery-end">
+        <button id="battery-calc-button">Afficher</button>
+      </div>
+      <!-- Le bouton toggle pour le moteur a été supprimé -->
+      <canvas id="battery-chart"></canvas>
     </div>
+  </div>
 
-    <!-- Modal pour l'affichage du graphique de tension (plein écran) -->
-    <div id="battery-modal" class="modal-overlay">
-        <div id="battery-modal-content" class="modal-content">
-            <button id="battery-modal-close" class="modal-close-btn">Fermer</button>
-            <h3>Historique de tension</h3>
-
-            <div class="engine-controls">
-                <label for="battery-start">Début :</label>
-                <input type="datetime-local" id="battery-start">
-
-                <label for="battery-end">Fin :</label>
-                <input type="datetime-local" id="battery-end">
-
-                <button id="battery-calc-button">Afficher</button>
-            </div>
-
-            <canvas id="battery-chart"></canvas>
-        </div>
+  <!-- Modal pour l'affichage du temps moteur -->
+  <div id="engine-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" id="engine-modal-content">
+      <button id="engine-modal-close" class="modal-close-btn">Fermer</button>
+      <h3>Heures moteur</h3>
+      <div class="engine-controls">
+        <label for="engine-start">Début :</label>
+        <input type="datetime-local" id="engine-start">
+        <label for="engine-end">Fin :</label>
+        <input type="datetime-local" id="engine-end">
+        <button id="engine-calc-button">Afficher</button>
+      </div>
+      <div id="engine-result" style="text-align:center; font-weight:bold; margin-bottom:20px;"></div>
+      <div id="engine-trips-list" style="text-align:center; margin-bottom:20px;"></div>
+      <button id="export-engine-button">Exporter en Excel</button>
+      <div style="margin-top:20px;">
+        <canvas id="engine-chart"></canvas>
+      </div>
     </div>
+  </div>
 
-    <!-- Modal pour l'affichage du temps moteur (plein écran) -->
-    <div id="engine-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" id="engine-modal-content">
-            <button id="engine-modal-close" class="modal-close-btn">Fermer</button>
-            <h3>Heures moteur</h3>
-
-            <div class="engine-controls">
-                <label for="engine-start">Début :</label>
-                <input type="datetime-local" id="engine-start">
-
-                <label for="engine-end">Fin :</label>
-                <input type="datetime-local" id="engine-end">
-
-                <button id="engine-calc-button">Afficher</button>
-            </div>
-
-            <div id="engine-result" style="text-align:center; font-weight:bold; margin-bottom:20px;"></div>
-            
-            <div id="engine-trips-list" style="text-align:center; margin-bottom:20px;"></div>
-
-            <button id="export-engine-button">Exporter en Excel</button>
-
-            <div style="margin-top:20px;">
-                <canvas id="engine-chart"></canvas>
-            </div>
-        </div>
+  <!-- Barre de recherche et sélection de tracker -->
+  <div id="search-container" style="display: none;">
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="Rechercher une adresse" autocomplete="off">
+      <button id="search-button">🔍</button>
+      <ul id="suggestions-list"></ul>
     </div>
+    <select id="tracker-select">
+      <option value="">Sélectionnez un device</option>
+    </select>
+    <button id="route-button">Afficher Route</button>
+  </div>
 
-    <!-- Barre de recherche d'adresse et sélection de tracker -->
-    <div id="search-container" style="display: none;">
-        <div class="search-bar">
-            <input type="text" id="search-input" placeholder="Rechercher une adresse" autocomplete="off">
-            <button id="search-button">🔍</button>
-            <ul id="suggestions-list"></ul>
-        </div>
-        <select id="tracker-select">
-            <option value="">Sélectionnez un device</option>
-        </select>
-        <button id="route-button">Afficher Route</button>
+  <!-- Panneaux de contrôle -->
+  <div id="controls-container">
+    <h2>Groupes</h2>
+    <div id="controls-content">
+      <div id="group-list">
+        <!-- Les cases à cocher seront ajoutées ici -->
+      </div>
     </div>
-
-    <!-- Panneaux de contrôle -->
-    <div id="controls-container">
-        <h2>Groupes</h2>
-        <div id="controls-content">
-            <div id="group-list">
-                <!-- Cases à cocher des groupes -->
-            </div>
-        </div>
+  </div>
+  <div id="depot-container">
+    <h2>Dépôt</h2>
+    <div id="depot-content">
+      <ul id="depot-list"></ul>
     </div>
-    <div id="depot-container">
-        <h2>Dépôt</h2>
-        <div id="depot-content">
-            <ul id="depot-list"></ul>
-        </div>
-    </div>
-    
-    <!-- Boutons de basculement -->
-    <div id="toggle-controls" class="toggle-button" title="Afficher/masquer les Groupes" style="display: none;">
-        &#9776;
-    </div>
-    <div id="toggle-depot" class="toggle-button" title="Afficher/masquer Dépôt" style="display: none;">
-        &#9776;
-    </div>
+  </div>
 
-    <!-- Switch pour changer la vue de la carte -->
-    <div id="map-switch-container" style="display: none;">
-        <span>Satellite</span>
-        <input type="checkbox" id="map-switch" title="Changer la vue de la carte">
-    </div>
+  <!-- Boutons de basculement -->
+  <div id="toggle-controls" class="toggle-button" title="Afficher/masquer les Groupes" style="display: none;">&#9776;</div>
+  <div id="toggle-depot" class="toggle-button" title="Afficher/masquer Dépôt" style="display: none;">&#9776;</div>
 
-    <!-- Timeline -->
-    <div id="timeline-container">
-        <input type="date" id="route-date" style="max-width: 150px;">
-        <input type="range" id="timeline" min="0" max="100" value="0">
-        <span id="current-time">00:00:00</span>
-    </div>
+  <!-- Switch pour changer la vue de la carte -->
+  <div id="map-switch-container" style="display: none;">
+    <span>Satellite</span>
+    <input type="checkbox" id="map-switch" title="Changer la vue de la carte">
+  </div>
 
-    <!-- Carte Mapbox -->
-    <div id="map"></div>
+  <!-- Timeline -->
+  <div id="timeline-container">
+    <input type="date" id="route-date" style="max-width: 150px;">
+    <input type="range" id="timeline" min="0" max="100" value="0">
+    <span id="current-time">00:00:00</span>
+  </div>
 
-    <script>
-        // Variables globales pour les identifiants
-        let MAPBOX_API_KEY = '';
-        let TRACCAR_AUTH = '';
+  <!-- Carte Mapbox -->
+  <div id="map"></div>
 
-        // Variables globales pour la carte
-        let map;
+  <script>
+    // Clé API Mapbox intégrée
+    let MAPBOX_API_KEY = 'pk.eyJ1IjoibHVkb2JldHJpcyIsImEiOiJjbTNhM3ljY3oxMXFxMmxzZmQwdm5tcWhpIn0.E22bDYSixD27MweKxToXyA';
+    let TRACCAR_AUTH = '';
 
-        // Variables globales pour stocker les données
-        let trackers = [];           
-        let devicePositionsMap = {}; 
-        let markers = {};
-        let groups = [];
-        let groupIdToName = {};
+    // Variables globales pour la carte
+    let map;
 
-        // Variable pour n'afficher qu'une popup à la fois
-        let currentPopup = null;
+    // Variables globales pour stocker les données
+    let trackers = [];
+    let devicePositionsMap = {};
+    let markers = {};
+    let groups = [];
+    let groupIdToName = {};
 
-        // Geofences
-        let geofences = [];
+    // Pour n'afficher qu'une popup à la fois
+    let currentPopup = null;
 
-        // Coordonnées de référence du dépôt
-        const depotCoordinates = [7.475422, 46.257917]; 
+    // Geofences
+    let geofences = [];
 
-        // Variables pour la timeline
-        let routeLayerId = 'tracker-route';
-        let timelineData = [];
-        let timelineMarker = null;
+    // Coordonnées du dépôt
+    const depotCoordinates = [7.475422, 46.257917];
 
-        // Eléments de recherche
-        const searchInput = document.getElementById('search-input');
-        const suggestionsList = document.getElementById('suggestions-list');
+    // Variables pour la timeline
+    let routeLayerId = 'tracker-route';
+    let timelineData = [];
+    let timelineMarker = null;
 
-        // Intervalle de mise à jour en ms
-        const UPDATE_INTERVAL = 10000;
-        let updateIntervalId = null;
+    // Éléments de recherche
+    const searchInput = document.getElementById('search-input');
+    const suggestionsList = document.getElementById('suggestions-list');
 
-        // Ensemble pour conserver les groupes cochés (reste persistant tant que la page n'est pas rechargée)
-        let checkedGroupsSet = new Set();
+    // Intervalle de mise à jour en ms
+    const UPDATE_INTERVAL = 10000;
+    let updateIntervalId = null;
 
-        // Graphique batterie
-        let currentBatteryDeviceId = null;
-        let batteryChart = null;
+    // Ensemble pour conserver les groupes cochés
+    let checkedGroupsSet = new Set();
 
-        // Graphique moteur
-        let currentEngineDeviceId = null;
-        let engineChart = null;
-        let currentEngineTrips = [];
+    // Graphiques
+    let currentBatteryDeviceId = null;
+    let batteryChart = null;
+    let currentEngineDeviceId = null;
+    let engineChart = null;
+    let currentEngineTrips = [];
 
-        // Pour la géolocalisation en direct (marqueur bleu)
-        let myLocationMarker = null;
-        let watchPositionId = null;
+    // Pour la géolocalisation en direct
+    let myLocationMarker = null;
+    let watchPositionId = null;
 
-        // ********** FONCTIONS UTILITAIRES **********
-
-        // Distance
-        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; 
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = 
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
+    // ********** FONCTIONS UTILITAIRES **********
+    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+    function getBatteryIcon(voltage) {
+      if (voltage < 18) {
+        if (voltage < 10.5) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
+        else if (voltage < 12.0) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv1.png";
+        else if (voltage < 12.35) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv2.png";
+        else if (voltage < 12.6) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv3.png";
+        else return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv4.png";
+      } else {
+        if (voltage < 20) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
+        else if (voltage < 24) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv1.png";
+        else if (voltage < 25.2) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv2.png";
+        else if (voltage < 26.4) return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv3.png";
+        else return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv4.png";
+      }
+    }
+    function getBatteryTooltip(voltage) {
+      if (voltage < 18) {
+        if (voltage < 10.5) return "Tension <10.5V : Batterie HS ou très déchargée.";
+        else if (voltage < 12.0) return "Tension ~12.0V : Batterie endommagée ou faible.";
+        else if (voltage < 12.35) return "Tension 12.0-12.35V : 25-50% de charge.";
+        else if (voltage < 12.6) return "Tension 12.35-12.59V : 50-99% de charge.";
+        else return "Tension >=12.6V : 100% chargée.";
+      } else {
+        if (voltage < 20) return "Tension <20V : Batterie HS ou très faible (24V).";
+        else if (voltage < 24) return "Tension 20-24V : Batterie faible.";
+        else if (voltage < 25.2) return "Tension 24-25.2V : 25-50% de charge.";
+        else if (voltage < 26.4) return "Tension 25.2-26.4V : 50-99% de charge.";
+        else return "Tension >=26.4V : 100% chargée (24V).";
+      }
+    }
+    function getLastConnectionLabel(lastTimeISO) {
+      if (!lastTimeISO) return '';
+      const lastTime = new Date(lastTimeISO).getTime();
+      const now = Date.now();
+      const diffMin = Math.floor((now - lastTime) / 60000);
+      if (diffMin <= 1) return '<span style="color: green;">En ligne</span>';
+      else if (diffMin <= 10) return `<span style="color: orange;">il y a ${diffMin} min</span>`;
+      else return `<span style="color: red;">il y a ${diffMin} min</span>`;
+    }
+    function calculateEngineHours(positions) {
+      if (!positions || positions.length < 2) return 0;
+      let totalMs = 0;
+      for (let i = 0; i < positions.length - 1; i++) {
+        const powerVal = parseFloat(positions[i].attributes?.power || 0);
+        const nextTime = new Date(positions[i+1].deviceTime).getTime();
+        const currentTime = new Date(positions[i].deviceTime).getTime();
+        if (powerVal < 18) {
+          if (powerVal >= 13.8 && powerVal < 15) totalMs += (nextTime - currentTime);
+        } else {
+          if (powerVal >= 27.2) totalMs += (nextTime - currentTime);
         }
+      }
+      return totalMs / (1000 * 3600);
+    }
+    function isInsideGeofence(lat, lon, geofence) {
+      if (!geofence.area) return false;
+      const area = geofence.area.trim();
+      if (area.startsWith("CIRCLE")) {
+        const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
+        const match = area.match(regexCircle);
+        if (!match) return false;
+        const circleLat = parseFloat(match[1]);
+        const circleLon = parseFloat(match[2]);
+        const radius = parseFloat(match[3]);
+        const dist = getDistanceFromLatLonInMeters(lat, lon, circleLat, circleLon);
+        return dist <= radius;
+      } else if (area.startsWith("POLYGON")) {
+        const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
+        const match = area.match(regexPoly);
+        if (!match) return false;
+        const coordsStr = match[1].trim();
+        const coordPairs = coordsStr.split(",").map(s => s.trim().split(" "));
+        let polygon = coordPairs.map(cp => [parseFloat(cp[1]), parseFloat(cp[0])]);
+        return pointInPolygon([lon, lat], polygon);
+      }
+      return false;
+    }
+    function pointInPolygon(point, vs) {
+      let x = point[0], y = point[1];
+      let inside = false;
+      for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+        let xi = vs[i][0], yi = vs[i][1];
+        let xj = vs[j][0], yj = vs[j][1];
+        let intersect = ((yi > y) !== (yj > y)) &&
+                        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+    function getGeofenceName(lat, lon, geofencesList) {
+      for (const gf of geofencesList) {
+        if (isInsideGeofence(lat, lon, gf)) return gf.name || "SansNom";
+      }
+      return "Aucune";
+    }
+    function approximateCircle(centerLat, centerLon, radiusM, points=64) {
+      const coords = [];
+      const radLat = centerLat * Math.PI / 180;
+      const distPerDegLat = 111300;
+      const distPerDegLon = 111300 * Math.cos(radLat);
+      for (let i = 0; i < points; i++) {
+        const angle = 2 * Math.PI * i / points;
+        const dx = radiusM * Math.cos(angle);
+        const dy = radiusM * Math.sin(angle);
+        const latOffset = dy / distPerDegLat;
+        const lonOffset = dx / distPerDegLon;
+        coords.push([centerLon + lonOffset, centerLat + latOffset]);
+      }
+      coords.push(coords[0]);
+      return coords;
+    }
+    function displayGeofences() {
+      if (map.getLayer('geofences-fill')) map.removeLayer('geofences-fill');
+      if (map.getLayer('geofences-outline')) map.removeLayer('geofences-outline');
+      if (map.getSource('geofences-source')) map.removeSource('geofences-source');
+      const features = [];
+      geofences.forEach(gf => {
+        if (!gf.area) return;
+        const area = gf.area.trim();
+        if (area.startsWith("CIRCLE")) {
+          const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
+          const match = area.match(regexCircle);
+          if (match) {
+            const lat = parseFloat(match[1]);
+            const lon = parseFloat(match[2]);
+            const radiusM = parseFloat(match[3]);
+            const circleCoords = approximateCircle(lat, lon, radiusM);
+            features.push({ type: 'Feature', properties: { name: gf.name }, geometry: { type: 'Polygon', coordinates: [ circleCoords ] } });
+          }
+        } else if (area.startsWith("POLYGON")) {
+          const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
+          const match = area.match(regexPoly);
+          if (match) {
+            const coordsStr = match[1].trim();
+            const coordPairs = coordsStr.split(",").map(s => s.trim().split(" "));
+            let ring = coordPairs.map(cp => [parseFloat(cp[1]), parseFloat(cp[0])]);
+            features.push({ type: 'Feature', properties: { name: gf.name }, geometry: { type: 'Polygon', coordinates: [ ring ] } });
+          }
+        }
+      });
+      const geojson = { type: 'FeatureCollection', features: features };
+      if (!features.length) return;
+      map.addSource('geofences-source', { type: 'geojson', data: geojson });
+      map.addLayer({ id: 'geofences-fill', type: 'fill', source: 'geofences-source', paint: { 'fill-color': '#000000', 'fill-opacity': 0 } });
+      map.addLayer({ id: 'geofences-outline', type: 'line', source: 'geofences-source', paint: { 'line-color': '#000000', 'line-width': 2 } });
+    }
 
-        // Icônes batterie
-        function getBatteryIcon(voltage) {
-            if (voltage < 18) {
-                // Cas 12V
-                if (voltage < 10.5) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
-                } else if (voltage < 12.0) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv1.png";
-                } else if (voltage < 12.35) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv2.png";
-                } else if (voltage < 12.6) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv3.png";
-                } else {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv4.png";
-                }
+    // ON/OFF moteur
+    function buildEngineOnOffData(positions) {
+      const result = [];
+      positions.forEach(pos => {
+        const powerVal = parseFloat(pos.attributes?.power || 0);
+        if (powerVal === 0) return;
+        let on = (powerVal < 18) ? (powerVal >= 13.8 && powerVal < 15 ? 1 : 0) : (powerVal >= 27.2 ? 1 : 0);
+        const lat = parseFloat(pos.latitude);
+        const lon = parseFloat(pos.longitude);
+        const gfName = getGeofenceName(lat, lon, geofences);
+        result.push({ time: new Date(pos.deviceTime), on: on, geofence: gfName });
+      });
+      return result;
+    }
+    function parseEngineTrips(onOffData) {
+      let trips = [];
+      let startTime = null;
+      let startGeofence = null;
+      for (let i = 0; i < onOffData.length; i++) {
+        const currentState = onOffData[i].on;
+        const currentTime = onOffData[i].time;
+        const currentGeofence = onOffData[i].geofence;
+        const isLast = (i === onOffData.length - 1);
+        if (currentState === 1 && startTime === null) {
+          startTime = currentTime;
+          startGeofence = currentGeofence;
+        }
+        if (startTime !== null) {
+          const nextTime = isLast ? currentTime : onOffData[i+1].time;
+          const geofenceChanged = (currentGeofence !== startGeofence);
+          const engineOff = (currentState === 0);
+          if (geofenceChanged || engineOff || isLast) {
+            const endTime = currentTime;
+            let diffMs = endTime - startTime;
+            let hours = diffMs / 3600000;
+            trips.push({ start: startTime, end: endTime, hours: hours, geofence: startGeofence });
+            if (geofenceChanged && currentState === 1) {
+              startTime = currentTime;
+              startGeofence = currentGeofence;
             } else {
-                // Cas 24V
-                if (voltage < 20) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv0.png";
-                } else if (voltage < 24) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv1.png";
-                } else if (voltage < 25.2) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv2.png";
-                } else if (voltage < 26.4) {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv3.png";
-                } else {
-                    return "https://raw.githubusercontent.com/ludobetris/3d-models/main/battery-lv4.png";
-                }
+              startTime = null;
+              startGeofence = null;
             }
+          }
         }
-        function getBatteryTooltip(voltage) {
-            if (voltage < 18) {
-                // Cas 12V
-                if (voltage < 10.5) {
-                    return "Tension <10.5V : Batterie HS ou très déchargée.";
-                } else if (voltage < 12.0) {
-                    return "Tension ~12.0V : Batterie endommagée ou faible.";
-                } else if (voltage < 12.35) {
-                    return "Tension 12.0-12.35V : 25-50% de charge.";
-                } else if (voltage < 12.6) {
-                    return "Tension 12.35-12.59V : 50-99% de charge.";
-                } else {
-                    return "Tension >=12.6V : 100% chargée.";
-                }
-            } else {
-                // Cas 24V
-                if (voltage < 20) {
-                    return "Tension <20V : Batterie HS ou très faible (24V).";
-                } else if (voltage < 24) {
-                    return "Tension 20-24V : Batterie faible.";
-                } else if (voltage < 25.2) {
-                    return "Tension 24-25.2V : 25-50% de charge.";
-                } else if (voltage < 26.4) {
-                    return "Tension 25.2-26.4V : 50-99% de charge.";
-                } else {
-                    return "Tension >=26.4V : 100% chargée (24V).";
-                }
-            }
+      }
+      return trips;
+    }
+
+    // ********** GESTION DU GRAPHIQUE BATTERIE **********
+    function showVoltageChart(deviceId) {
+      currentBatteryDeviceId = deviceId;
+      const modal = document.getElementById('battery-modal');
+      const batteryModalContent = document.getElementById('battery-modal-content');
+      const oldLoading = document.getElementById('battery-loading-text');
+      if (oldLoading) oldLoading.remove();
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      const currentIso = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      const midnightIso = new Date(midnight.getTime() - midnight.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      document.getElementById('battery-start').value = midnightIso;
+      document.getElementById('battery-end').value = currentIso;
+      let loadingText = document.createElement('p');
+      loadingText.id = 'battery-loading-text';
+      loadingText.innerText = 'Chargement...';
+      batteryModalContent.appendChild(loadingText);
+      if (batteryChart) { batteryChart.destroy(); batteryChart = null; }
+      modal.style.display = 'flex';
+      loadBatteryDataForRange();
+    }
+    function closeVoltageChart() { document.getElementById('battery-modal').style.display = 'none'; }
+    function loadBatteryDataForRange() {
+      if (!currentBatteryDeviceId) {
+        alert("Aucun deviceId sélectionné pour le graphique.");
+        return;
+      }
+      const startInput = document.getElementById('battery-start').value;
+      const endInput = document.getElementById('battery-end').value;
+      if (!startInput || !endInput) {
+        alert("Merci de renseigner la date/heure début et fin.");
+        return;
+      }
+      const fromISO = new Date(startInput).toISOString();
+      const toISO = new Date(endInput).toISOString();
+      fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
+        method: 'GET',
+        headers: { 'Authorization': 'Basic ' + TRACCAR_AUTH, 'Content-Type': 'application/json' }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Réponse du serveur incorrecte: " + response.statusText);
+        return response.json();
+      })
+      .then(data => {
+        const loadTxt = document.getElementById('battery-loading-text');
+        if (loadTxt) loadTxt.remove();
+        if (!data || !data.length) {
+          alert("Aucune donnée de tension trouvée dans cette plage.");
+          return;
         }
-
-        // Dernière connexion
-        function getLastConnectionLabel(lastTimeISO) {
-            if (!lastTimeISO) return '';
-            const lastTime = new Date(lastTimeISO).getTime();
-            const now = Date.now();
-            const diffMs = now - lastTime; 
-            const diffMin = Math.floor(diffMs / 60000);
-
-            if (diffMin <= 1) {
-                return '<span style="color: green;">En ligne</span>';
-            } else if (diffMin <= 10) {
-                return `<span style="color: orange;">il y a ${diffMin} min</span>`;
-            } else {
-                return `<span style="color: red;">il y a ${diffMin} min</span>`;
-            }
+        // Transformation des données pour le graphique
+        data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
+        const voltagePoints = [];
+        data.forEach(pos => {
+          let pVal = pos.attributes?.power;
+          if (pVal !== undefined) {
+            const parsed = parseFloat(pVal);
+            if (!isNaN(parsed)) voltagePoints.push({ x: pos.deviceTime, y: parsed });
+          }
+        });
+        const powerValues = voltagePoints.map(pt => pt.y);
+        const minVal = Math.min(...powerValues);
+        const maxVal = Math.max(...powerValues);
+        // Détermination du seuil moteur en fonction du système (12V ou 24V)
+        let engineThreshold;
+        if (maxVal < 18) {
+          engineThreshold = 13.8;
+        } else {
+          engineThreshold = 27.2;
         }
-
-        // Heures moteur
-        function calculateEngineHours(positions) {
-            if (!positions || positions.length < 2) return 0;
-            let totalMs = 0;
-            for (let i = 0; i < positions.length - 1; i++) {
-                const powerVal = parseFloat(positions[i].attributes?.power || 0);
-                const nextTime = new Date(positions[i+1].deviceTime).getTime();
-                const currentTime = new Date(positions[i].deviceTime).getTime();
-
-                if (powerVal < 18) {
-                    // 12V => ON si >=13.8 && <15
-                    if (powerVal >= 13.8 && powerVal < 15) {
-                        totalMs += (nextTime - currentTime);
-                    }
-                } else {
-                    // 24V => ON si >= 27.2
-                    if (powerVal >= 27.2) {
-                        totalMs += (nextTime - currentTime);
-                    }
+        const ctx = document.getElementById('battery-chart').getContext('2d');
+        if (batteryChart) { batteryChart.destroy(); }
+        batteryChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            datasets: [
+              { label: 'Voltage (V)', data: voltagePoints, borderColor: 'blue', fill: false }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              annotation: {
+                annotations: {
+                  line105: { type: 'line', yMin: 10.5, yMax: 10.5, borderColor: 'red', borderWidth: 1, label: { enabled: true, content: '10.5V (HS)', position: 'end' } },
+                  line120: { type: 'line', yMin: 12.0, yMax: 12.0, borderColor: 'orange', borderWidth: 1, label: { enabled: true, content: '12.0V', position: 'end' } },
+                  line1235: { type: 'line', yMin: 12.35, yMax: 12.35, borderColor: 'yellow', borderWidth: 1, label: { enabled: true, content: '12.35V', position: 'end' } },
+                  line126: { type: 'line', yMin: 12.6, yMax: 12.6, borderColor: 'green', borderWidth: 1, label: { enabled: true, content: '12.6V', position: 'end' } },
+                  line200: { type: 'line', yMin: 20.0, yMax: 20.0, borderColor: 'red', borderWidth: 1, label: { enabled: true, content: '20V (HS-24V)', position: 'end' } },
+                  line240: { type: 'line', yMin: 24.0, yMax: 24.0, borderColor: 'orange', borderWidth: 1, label: { enabled: true, content: '24V', position: 'end' } },
+                  line252: { type: 'line', yMin: 25.2, yMax: 25.2, borderColor: 'yellow', borderWidth: 1, label: { enabled: true, content: '25.2V', position: 'end' } },
+                  line264: { type: 'line', yMin: 26.4, yMax: 26.4, borderColor: 'green', borderWidth: 1, label: { enabled: true, content: '26.4V', position: 'end' } },
+                  engineThresholdLine: { type: 'line', yMin: engineThreshold, yMax: engineThreshold, borderColor: 'purple', borderWidth: 2, label: { enabled: true, content: `Seuil moteur: ${engineThreshold}V`, position: 'end' } }
                 }
+              }
+            },
+            scales: {
+              x: { type: 'time', time: { tooltipFormat: 'YYYY-MM-DD HH:mm:ss', displayFormats: { hour: 'YYYY-MM-DD HH:mm' } }, title: { display: true, text: 'Heure' } },
+              y: { min: Math.floor(minVal - 0.5), max: Math.ceil(maxVal + 0.5), title: { display: true, text: 'Voltage (V)' } }
             }
-            return totalMs / (1000 * 3600);
+          }
+        });
+      })
+      .catch(err => {
+        const loadTxt = document.getElementById('battery-loading-text');
+        if (loadTxt) loadTxt.remove();
+        console.error(err);
+        alert("Erreur lors de la récupération des données de tension: " + err.message);
+      });
+    }
+
+    // ********** GESTION DU MOTEUR **********
+    function showEngineModal(deviceId, defaultHours = 0) {
+      currentEngineDeviceId = deviceId;
+      document.getElementById('engine-result').textContent = `Heures moteur (journée) : ~${defaultHours.toFixed(2)} h`;
+      document.getElementById('engine-trips-list').innerHTML = '';
+      currentEngineTrips = [];
+      if (engineChart) { engineChart.destroy(); engineChart = null; }
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      const tomorrow = new Date(midnight.getTime() + 24 * 60 * 60 * 1000);
+      const midnightIso = new Date(midnight.getTime() - midnight.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      const tomorrowIso = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      document.getElementById('engine-start').value = midnightIso;
+      document.getElementById('engine-end').value = tomorrowIso;
+      document.getElementById('engine-modal').style.display = 'flex';
+    }
+    function closeEngineModal() { document.getElementById('engine-modal').style.display = 'none'; }
+    function loadEngineDataForRange() {
+      if (!currentEngineDeviceId) {
+        alert("Aucun deviceId sélectionné.");
+        return;
+      }
+      const startInput = document.getElementById('engine-start').value;
+      const endInput = document.getElementById('engine-end').value;
+      if (!startInput || !endInput) {
+        alert("Merci de renseigner la date/heure début et fin.");
+        return;
+      }
+      const fromISO = new Date(startInput).toISOString();
+      const toISO = new Date(endInput).toISOString();
+      fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${currentEngineDeviceId}&from=${fromISO}&to=${toISO}`, {
+        method: 'GET',
+        headers: { 'Authorization': 'Basic ' + TRACCAR_AUTH, 'Content-Type': 'application/json' }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Réponse du serveur incorrecte: " + response.statusText);
+        return response.json();
+      })
+      .then(data => {
+        if (!data || !data.length) {
+          alert("Aucune donnée dans cet intervalle.");
+          return;
         }
-
-        // Geofences
-        function isInsideGeofence(lat, lon, geofence) {
-            if (!geofence.area) return false;
-            const area = geofence.area.trim();
-            if (area.startsWith("CIRCLE")) {
-                const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
-                const match = area.match(regexCircle);
-                if (!match) return false;
-                const circleLat = parseFloat(match[1]);
-                const circleLon = parseFloat(match[2]);
-                const radius = parseFloat(match[3]);
-                const dist = getDistanceFromLatLonInMeters(lat, lon, circleLat, circleLon);
-                return dist <= radius;
-            } else if (area.startsWith("POLYGON")) {
-                const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
-                const match = area.match(regexPoly);
-                if (!match) return false;
-                const coordsStr = match[1].trim();
-                const coordPairs = coordsStr.split(",").map(s => s.trim().split(" "));
-                let polygon = coordPairs.map(cp => [parseFloat(cp[1]), parseFloat(cp[0])]);
-                return pointInPolygon([lon, lat], polygon);
+        data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
+        const onOffData = buildEngineOnOffData(data);
+        const trips = parseEngineTrips(onOffData);
+        currentEngineTrips = trips;
+        let totalHours = trips.reduce((acc, t) => acc + t.hours, 0);
+        document.getElementById('engine-result').textContent = `Heures moteur (plage sélectionnée) : ~${totalHours.toFixed(2)} h`;
+        displayEngineTripsTable(trips);
+        const labels = onOffData.map(d => d.time);
+        const onOffValues = onOffData.map(d => d.on);
+        const ctx = document.getElementById('engine-chart').getContext('2d');
+        if (engineChart) engineChart.destroy();
+        engineChart = new Chart(ctx, {
+          type: 'line',
+          data: { labels: labels, datasets: [{ label: 'Moteur (1=ON, 0=OFF)', data: onOffValues, borderColor: 'red', fill: false, stepped: true }] },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { type: 'time', time: { tooltipFormat: 'YYYY-MM-DD HH:mm:ss', displayFormats: { hour: 'YYYY-MM-DD HH:mm' } }, title: { display: true, text: 'Heure' } },
+              y: { title: { display: true, text: 'Etat moteur' }, ticks: { stepSize: 1, callback: value => value === 1 ? 'ON' : 'OFF' }, min: 0, max: 1 }
             }
-            return false;
-        }
-        function pointInPolygon(point, vs) {
-            let x = point[0], y = point[1];
-            let inside = false;
-            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-                let xi = vs[i][0], yi = vs[i][1];
-                let xj = vs[j][0], yj = vs[j][1];
-                let intersect = ((yi > y) !== (yj > y)) &&
-                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-                if (intersect) inside = !inside;
-            }
-            return inside;
-        }
-        function getGeofenceName(lat, lon, geofencesList) {
-            for (const gf of geofencesList) {
-                if (isInsideGeofence(lat, lon, gf)) {
-                    return gf.name || "SansNom";
-                }
-            }
-            return "Aucune";
-        }
-        function approximateCircle(centerLat, centerLon, radiusM, points=64) {
-            const coords = [];
-            const radLat = centerLat * Math.PI / 180;
-            const distPerDegLat = 111300; 
-            const distPerDegLon = 111300 * Math.cos(radLat);
-
-            for (let i = 0; i < points; i++) {
-                const angle = 2 * Math.PI * i / points;
-                const dx = radiusM * Math.cos(angle);
-                const dy = radiusM * Math.sin(angle);
-                const latOffset = dy / distPerDegLat;
-                const lonOffset = dx / distPerDegLon;
-                coords.push([centerLon + lonOffset, centerLat + latOffset]);
-            }
-            coords.push(coords[0]);
-            return coords;
-        }
-        function displayGeofences() {
-            if (map.getLayer('geofences-fill')) {
-                map.removeLayer('geofences-fill');
-            }
-            if (map.getLayer('geofences-outline')) {
-                map.removeLayer('geofences-outline');
-            }
-            if (map.getSource('geofences-source')) {
-                map.removeSource('geofences-source');
-            }
-            const features = [];
-            geofences.forEach(gf => {
-                if (!gf.area) return;
-                const area = gf.area.trim();
-                if (area.startsWith("CIRCLE")) {
-                    const regexCircle = /CIRCLE\s*\(\s*([\d\.\-]+)\s+([\d\.\-]+)\s*,\s*([\d\.]+)\s*\)/i;
-                    const match = area.match(regexCircle);
-                    if (match) {
-                        const lat = parseFloat(match[1]);
-                        const lon = parseFloat(match[2]);
-                        const radiusM = parseFloat(match[3]);
-                        const circleCoords = approximateCircle(lat, lon, radiusM);
-                        features.push({
-                            type: 'Feature',
-                            properties: { name: gf.name },
-                            geometry: {
-                                type: 'Polygon',
-                                coordinates: [ circleCoords ]
-                            }
-                        });
-                    }
-                } else if (area.startsWith("POLYGON")) {
-                    const regexPoly = /POLYGON\s*\(\(\s*(.+)\s*\)\)/i;
-                    const match = area.match(regexPoly);
-                    if (match) {
-                        const coordsStr = match[1].trim();
-                        const coordPairs = coordsStr.split(",").map(s => s.trim().split(" "));
-                        let ring = coordPairs.map(cp => [parseFloat(cp[1]), parseFloat(cp[0])]);
-                        features.push({
-                            type: 'Feature',
-                            properties: { name: gf.name },
-                            geometry: {
-                                type: 'Polygon',
-                                coordinates: [ ring ]
-                            }
-                        });
-                    }
-                }
-            });
-
-            const geojson = {
-                type: 'FeatureCollection',
-                features: features
-            };
-
-            if (!features.length) return;
-
-            map.addSource('geofences-source', {
-                type: 'geojson',
-                data: geojson
-            });
-
-            map.addLayer({
-                id: 'geofences-fill',
-                type: 'fill',
-                source: 'geofences-source',
-                paint: {
-                    'fill-color': '#000000',
-                    'fill-opacity': 0
-                }
-            });
-
-            map.addLayer({
-                id: 'geofences-outline',
-                type: 'line',
-                source: 'geofences-source',
-                paint: {
-                    'line-color': '#000000',
-                    'line-width': 2
-                }
-            });
-        }
-
-        // ON/OFF moteur
-        function buildEngineOnOffData(positions) {
-            const result = [];
-            positions.forEach(pos => {
-                const powerVal = parseFloat(pos.attributes?.power || 0);
-                if (powerVal === 0) {
-                    return;
-                }
-                let on = 0;
-                if (powerVal < 18) {
-                    // 12V => ON si >=13.8 && <15
-                    on = (powerVal >= 13.8 && powerVal < 15) ? 1 : 0;
-                } else {
-                    // 24V => ON si >=27.2
-                    on = (powerVal >= 27.2) ? 1 : 0;
-                }
-                const lat = parseFloat(pos.latitude);
-                const lon = parseFloat(pos.longitude);
-                const gfName = getGeofenceName(lat, lon, geofences);
-                result.push({
-                    time: new Date(pos.deviceTime),
-                    on: on,
-                    geofence: gfName
-                });
-            });
-            return result;
-        }
-        function parseEngineTrips(onOffData) {
-            let trips = [];
-            let startTime = null;
-            let startGeofence = null;
-
-            for (let i = 0; i < onOffData.length; i++) {
-                const currentState = onOffData[i].on;
-                const currentTime = onOffData[i].time;
-                const currentGeofence = onOffData[i].geofence;
-                const isLast = (i === onOffData.length - 1);
-
-                if (currentState === 1 && startTime === null) {
-                    startTime = currentTime;
-                    startGeofence = currentGeofence;
-                }
-                if (startTime !== null) {
-                    const nextTime = isLast ? currentTime : onOffData[i+1].time;
-                    const nextGeofence = isLast ? currentGeofence : onOffData[i+1].geofence;
-                    const geofenceChanged = (currentGeofence !== startGeofence);
-                    const engineOff = (currentState === 0);
-
-                    if (geofenceChanged || engineOff || isLast) {
-                        const endTime = engineOff ? currentTime : currentTime;
-                        let diffMs = endTime - startTime;
-                        let hours = diffMs / 3600000;
-                        trips.push({
-                            start: startTime,
-                            end: endTime,
-                            hours: hours,
-                            geofence: startGeofence
-                        });
-
-                        if (geofenceChanged && currentState === 1) {
-                            startTime = currentTime;
-                            startGeofence = currentGeofence;
-                        } else {
-                            startTime = null;
-                            startGeofence = null;
-                        }
-                    }
-                }
-            }
-            return trips;
-        }
-
-        // ********** GESTION DU GRAPHIQUE BATTERIE **********
-        function showVoltageChart(deviceId) {
-            currentBatteryDeviceId = deviceId;
-            const modal = document.getElementById('battery-modal');
-            const batteryModalContent = document.getElementById('battery-modal-content');
-            const oldLoading = document.getElementById('battery-loading-text');
-            if (oldLoading) oldLoading.remove();
-
-            const batteryNow = new Date();
-            const batteryMidnight = new Date(batteryNow.getFullYear(), batteryNow.getMonth(), batteryNow.getDate(), 0, 0, 0);
-            const batteryCurrentIso = new Date(batteryNow.getTime() - batteryNow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            const batteryMidnightIso = new Date(batteryMidnight.getTime() - batteryMidnight.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            document.getElementById('battery-start').value = batteryMidnightIso;
-            document.getElementById('battery-end').value = batteryCurrentIso;
-
-            let loadingText = document.createElement('p');
-            loadingText.id = 'battery-loading-text';
-            loadingText.innerText = 'Chargement...';
-            batteryModalContent.appendChild(loadingText);
-
-            if (batteryChart) {
-                batteryChart.destroy();
-                batteryChart = null;
-            }
-            modal.style.display = 'flex';
-
-            loadBatteryDataForRange();
-        }
-        function closeVoltageChart() {
-            const modal = document.getElementById('battery-modal');
-            modal.style.display = 'none';
-        }
-        function loadBatteryDataForRange() {
-            if (!currentBatteryDeviceId) {
-                alert("Aucun deviceId sélectionné pour le graphique.");
-                return;
-            }
-            const startInput = document.getElementById('battery-start').value;
-            const endInput = document.getElementById('battery-end').value;
-            if (!startInput || !endInput) {
-                alert("Merci de renseigner la date/heure début et fin.");
-                return;
-            }
-
-            const fromISO = new Date(startInput).toISOString();
-            const toISO = new Date(endInput).toISOString();
-
-            fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${currentBatteryDeviceId}&from=${fromISO}&to=${toISO}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Basic ' + TRACCAR_AUTH,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Réponse du serveur incorrecte: " + response.statusText);
-                }
-                return response.json();
-            })
-            .then(data => {
-                const loadTxt = document.getElementById('battery-loading-text');
-                if (loadTxt) loadTxt.remove();
-
-                if (!data || !data.length) {
-                    alert("Aucune donnée de tension trouvée dans cette plage.");
-                    return;
-                }
-                const labels = [];
-                const powers = [];
-                data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
-                data.forEach(pos => {
-                    let pVal = pos.attributes?.power;
-                    if (pVal !== undefined) {
-                        const parsed = parseFloat(pVal);
-                        if (!isNaN(parsed)) {
-                            labels.push(pos.deviceTime);
-                            powers.push(parsed);
-                        }
-                    }
-                });
-                if (powers.length === 0) {
-                    alert("Aucune donnée de tension (champ 'power') dans cette plage.");
-                    return;
-                }
-                
-                const minVal = Math.min(...powers);
-                const maxVal = Math.max(...powers);
-                const margin = 0.5; 
-
-                const ctx = document.getElementById('battery-chart').getContext('2d');
-                if (batteryChart) {
-                    batteryChart.destroy();
-                }
-                batteryChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Voltage (V)',
-                            data: powers,
-                            borderColor: 'blue',
-                            fill: false
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            annotation: {
-                                annotations: {
-                                    line105: {
-                                        type: 'line',
-                                        yMin: 10.5,
-                                        yMax: 10.5,
-                                        borderColor: 'red',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '10.5V (HS)',
-                                            position: 'end'
-                                        }
-                                    },
-                                    line120: {
-                                        type: 'line',
-                                        yMin: 12.0,
-                                        yMax: 12.0,
-                                        borderColor: 'orange',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '12.0V',
-                                            position: 'end'
-                                        }
-                                    },
-                                    line1235: {
-                                        type: 'line',
-                                        yMin: 12.35,
-                                        yMax: 12.35,
-                                        borderColor: 'yellow',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '12.35V',
-                                            position: 'end'
-                                        }
-                                    },
-                                    line126: {
-                                        type: 'line',
-                                        yMin: 12.6,
-                                        yMax: 12.6,
-                                        borderColor: 'green',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '12.6V',
-                                            position: 'end'
-                                        }
-                                    },
-                                    line200: {
-                                        type: 'line',
-                                        yMin: 20.0,
-                                        yMax: 20.0,
-                                        borderColor: 'red',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '20V (HS-24V)',
-                                            position: 'end'
-                                        }
-                                    },
-                                    line240: {
-                                        type: 'line',
-                                        yMin: 24.0,
-                                        yMax: 24.0,
-                                        borderColor: 'orange',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '24V',
-                                            position: 'end'
-                                        }
-                                    },
-                                    line252: {
-                                        type: 'line',
-                                        yMin: 25.2,
-                                        yMax: 25.2,
-                                        borderColor: 'yellow',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '25.2V',
-                                            position: 'end'
-                                        }
-                                    },
-                                    line264: {
-                                        type: 'line',
-                                        yMin: 26.4,
-                                        yMax: 26.4,
-                                        borderColor: 'green',
-                                        borderWidth: 1,
-                                        label: {
-                                            enabled: true,
-                                            content: '26.4V',
-                                            position: 'end'
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: {
-                                    tooltipFormat: 'YYYY-MM-DD HH:mm:ss',
-                                    displayFormats: {
-                                        hour: 'YYYY-MM-DD HH:mm'
-                                    }
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Heure'
-                                }
-                            },
-                            y: {
-                                min: Math.floor(minVal - margin),
-                                max: Math.ceil(maxVal + margin),
-                                title: {
-                                    display: true,
-                                    text: 'Voltage (V)'
-                                }
-                            }
-                        }
-                    }
-                });
-            })
-            .catch(err => {
-                const loadTxt = document.getElementById('battery-loading-text');
-                if (loadTxt) loadTxt.remove();
-
-                console.error(err);
-                alert("Erreur lors de la récupération des données de tension: " + err.message);
-            });
-        }
-
-        // ********** GESTION DU MOTEUR **********
-        function showEngineModal(deviceId, defaultHours = 0) {
-            currentEngineDeviceId = deviceId;
-            const modal = document.getElementById('engine-modal');
-            document.getElementById('engine-result').textContent = `Heures moteur (journée) : ~${defaultHours.toFixed(2)} h`;
-            document.getElementById('engine-trips-list').innerHTML = '';
-            currentEngineTrips = [];
-
-            if (engineChart) {
-                engineChart.destroy();
-                engineChart = null;
-            }
-            const now = new Date();
-            const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            const currentIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            const midnightIso = new Date(midnight.getTime() - midnight.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            document.getElementById('engine-start').value = midnightIso;
-            document.getElementById('engine-end').value = currentIso;
-
-            modal.style.display = 'flex';
-        }
-        function closeEngineModal() {
-            document.getElementById('engine-modal').style.display = 'none';
-        }
-        function loadEngineDataForRange() {
-            if (!currentEngineDeviceId) {
-                alert("Aucun deviceId sélectionné.");
-                return;
-            }
-            const startInput = document.getElementById('engine-start').value;
-            const endInput = document.getElementById('engine-end').value;
-            if (!startInput || !endInput) {
-                alert("Merci de renseigner la date/heure début et fin.");
-                return;
-            }
-            const fromISO = new Date(startInput).toISOString();
-            const toISO = new Date(endInput).toISOString();
-
-            fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${currentEngineDeviceId}&from=${fromISO}&to=${toISO}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Basic ' + TRACCAR_AUTH,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Réponse du serveur incorrecte: " + response.statusText);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data || !data.length) {
-                    alert("Aucune donnée dans cet intervalle.");
-                    return;
-                }
-                data.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
-                const onOffData = buildEngineOnOffData(data);
-                const trips = parseEngineTrips(onOffData);
-                currentEngineTrips = trips;
-
-                let totalHours = trips.reduce((acc, t) => acc + t.hours, 0);
-                document.getElementById('engine-result').textContent = 
-                    `Heures moteur (plage sélectionnée) : ~${totalHours.toFixed(2)} h`;
-
-                displayEngineTripsTable(trips);
-
-                const labels = onOffData.map(d => d.time);
-                const onOffValues = onOffData.map(d => d.on);
-
-                const ctx = document.getElementById('engine-chart').getContext('2d');
-                if (engineChart) {
-                    engineChart.destroy();
-                }
-                engineChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Moteur (1=ON, 0=OFF)',
-                            data: onOffValues,
-                            borderColor: 'red',
-                            fill: false,
-                            stepped: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: {
-                                    tooltipFormat: 'YYYY-MM-DD HH:mm:ss',
-                                    displayFormats: {
-                                        hour: 'YYYY-MM-DD HH:mm'
-                                    }
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Heure'
-                                }
-                            },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: 'Etat moteur'
-                                },
-                                ticks: {
-                                    stepSize: 1,
-                                    callback: function(value) {
-                                        return value === 1 ? 'ON' : 'OFF';
-                                    }
-                                },
-                                min: 0,
-                                max: 1
-                            }
-                        }
-                    }
-                });
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Erreur lors de la récupération des données moteur: " + err.message);
-            });
-        }
-        function displayEngineTripsTable(trips) {
-            const container = document.getElementById('engine-trips-list');
-            container.innerHTML = '';
-            if (!trips || !trips.length) {
-                container.textContent = 'Aucun trajet moteur ON->OFF trouvé.';
-                return;
-            }
-            let tableHtml = `
-                <table id="engine-trips-table">
-                    <thead>
-                        <tr>
-                            <th>Début</th>
-                            <th>Fin</th>
-                            <th>Heures</th>
-                            <th>Géofence</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            trips.forEach(t => {
-                const startStr = t.start.toLocaleString();
-                const endStr = t.end.toLocaleString();
-                const hoursStr = t.hours.toFixed(2);
-                tableHtml += `
-                    <tr>
+          }
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Erreur lors de la récupération des données moteur: " + err.message);
+      });
+    }
+    function displayEngineTripsTable(trips) {
+      const container = document.getElementById('engine-trips-list');
+      container.innerHTML = '';
+      if (!trips || !trips.length) {
+        container.textContent = 'Aucun trajet moteur ON->OFF trouvé.';
+        return;
+      }
+      let tableHtml = `
+        <table id="engine-trips-table">
+          <thead>
+            <tr>
+              <th>Début</th>
+              <th>Fin</th>
+              <th>Heures</th>
+              <th>Géofence</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      trips.forEach(t => {
+        const startStr = t.start.toLocaleString();
+        const endStr = t.end.toLocaleString();
+        const hoursStr = t.hours.toFixed(2);
+        tableHtml += `<tr>
                         <td>${startStr}</td>
                         <td>${endStr}</td>
                         <td>${hoursStr}</td>
                         <td>${t.geofence}</td>
-                    </tr>
-                `;
+                      </tr>`;
+      });
+      tableHtml += `</tbody></table>`;
+      container.innerHTML = tableHtml;
+    }
+    function exportEngineDataToExcel() {
+      if (!currentEngineTrips || !currentEngineTrips.length) {
+        alert("Aucune donnée à exporter.");
+        return;
+      }
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Début;Fin;Heures;Géofence\n";
+      currentEngineTrips.forEach(t => {
+        const startStr = t.start.toLocaleString().replace(/;/g, ",");
+        const endStr = t.end.toLocaleString().replace(/;/g, ",");
+        const hoursStr = t.hours.toFixed(2);
+        const gfStr = t.geofence.replace(/;/g, ",");
+        csvContent += `${startStr};${endStr};${hoursStr};${gfStr}\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "heures_moteur.xls");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // ********** FONCTIONS D’AFFICHAGE DU BEACON **********
+    function addAccuracyCircle(deviceId, coordinates, radiusM) {
+      const sourceId = "accuracy-circle-" + deviceId;
+      const layerId = sourceId + "-layer";
+      removeAccuracyCircle(deviceId);
+      const circle = approximateCircle(coordinates[1], coordinates[0], radiusM, 32);
+      map.addSource(sourceId, { type: "geojson", data: { type: "Feature", geometry: { type: "Polygon", coordinates: [circle] } } });
+      map.addLayer({ id: layerId, type: "fill", source: sourceId, paint: { "fill-color": "#0000ff", "fill-opacity": 0.2 } });
+    }
+    function removeAccuracyCircle(deviceId) {
+      const sourceId = "accuracy-circle-" + deviceId;
+      const layerId = sourceId + "-layer";
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+      if (map.getSource(sourceId)) map.removeSource(sourceId);
+    }
+
+    // ********** RÉCUPÉRATION DES TRACKERS **********
+    async function getTrackersData() {
+      try {
+        // 1) devices
+        const devicesResponse = await fetch('https://xf5655945.traccar.com/api/devices', {
+          method: 'GET',
+          headers: { 'Authorization': 'Basic ' + TRACCAR_AUTH, 'Content-Type': 'application/json' }
+        });
+        if (!devicesResponse.ok) throw new Error("Erreur récupération devices: " + devicesResponse.statusText);
+        const devicesData = await devicesResponse.json();
+
+        // 2) groupes
+        const groupsResponse = await fetch('https://xf5655945.traccar.com/api/groups', {
+          method: 'GET',
+          headers: { 'Authorization': 'Basic ' + TRACCAR_AUTH, 'Content-Type': 'application/json' }
+        });
+        if (!groupsResponse.ok) throw new Error("Erreur récupération groupes: " + groupsResponse.statusText);
+        const groupsData = await groupsResponse.json();
+        groups = groupsData;
+        groups.forEach(group => { groupIdToName[group.id] = group.name; });
+
+        // 3) geofences
+        const geofencesResp = await fetch('https://xf5655945.traccar.com/api/geofences', {
+          method: 'GET',
+          headers: { 'Authorization': 'Basic ' + TRACCAR_AUTH, 'Content-Type': 'application/json' }
+        });
+        if (!geofencesResp.ok) console.warn("Erreur récupération geofences:", geofencesResp.statusText);
+        else geofences = await geofencesResp.json();
+
+        const now = new Date();
+        const dateTo = now.toISOString();
+        const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString();
+        const finalDevices = [];
+        for (const dev of devicesData) {
+          const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
+          let isBeacon = (dev.attributes && dev.attributes.isbeacon === true);
+          const positionsUrl = `https://xf5655945.traccar.com/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
+          const positionsResp = await fetch(positionsUrl, {
+            method: 'GET',
+            headers: { 'Authorization': 'Basic ' + TRACCAR_AUTH, 'Content-Type': 'application/json' }
+          });
+          if (!positionsResp.ok) { console.warn(`Erreur positions device ${dev.id}: ${positionsResp.statusText}`); continue; }
+          const positionsData = await positionsResp.json();
+          if (!positionsData || positionsData.length === 0) {
+            finalDevices.push({
+              deviceId: dev.id,
+              name: dev.name || `Tracker ${dev.id}`,
+              group: devGroup,
+              latitude: null,
+              longitude: null,
+              hasPositions: false,
+              avgVoltage: null,
+              engineHoursToday: 0,
+              lastConnectionTime: null,
+              isBeacon: isBeacon,
+              accuracy: 0
             });
-            tableHtml += `</tbody></table>`;
-            container.innerHTML = tableHtml;
-        }
-        function exportEngineDataToExcel() {
-            if (!currentEngineTrips || !currentEngineTrips.length) {
-                alert("Aucune donnée à exporter.");
-                return;
+            continue;
+          }
+          positionsData.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
+          const lastPos = positionsData[positionsData.length - 1];
+          const lat = parseFloat(lastPos.latitude);
+          const lon = parseFloat(lastPos.longitude);
+          let powers = [];
+          for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
+            let pVal = positionsData[i].attributes?.power;
+            if (pVal !== undefined) {
+              const parsed = parseFloat(pVal);
+              if (!isNaN(parsed)) powers.push(parsed);
             }
-            let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Début;Fin;Heures;Géofence\n";
-            currentEngineTrips.forEach(t => {
-                const startStr = t.start.toLocaleString().replace(/;/g, ",");
-                const endStr = t.end.toLocaleString().replace(/;/g, ",");
-                const hoursStr = t.hours.toFixed(2);
-                const gfStr = t.geofence.replace(/;/g, ",");
-                csvContent += `${startStr};${endStr};${hoursStr};${gfStr}\n`;
-            });
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "heures_moteur.xls");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+          }
+          let avgV = null;
+          if (powers.length > 0) {
+            const sum = powers.reduce((acc, val) => acc + val, 0);
+            avgV = Math.round((sum / powers.length) * 100) / 100;
+          }
+          let accuracyVal = parseFloat(lastPos.accuracy || 0);
+          let engineHoursToday = (!isBeacon) ? calculateEngineHours(positionsData) : 0;
+          finalDevices.push({
+            deviceId: dev.id,
+            name: dev.name || `Tracker ${dev.id}`,
+            group: devGroup,
+            latitude: lat,
+            longitude: lon,
+            hasPositions: true,
+            avgVoltage: avgV,
+            engineHoursToday: engineHoursToday,
+            lastConnectionTime: lastPos.deviceTime,
+            isBeacon: isBeacon,
+            accuracy: accuracyVal
+          });
         }
-
-        // ********** FONCTIONS D’AFFICHAGE DU BEACON (PRÉCISION) **********
-        // Ajout/suppression du cercle de précision autour d'un beacon
-        function addAccuracyCircle(deviceId, coordinates, radiusM) {
-            const sourceId = "accuracy-circle-" + deviceId;
-            const layerId = sourceId + "-layer";
-            removeAccuracyCircle(deviceId);
-            const circle = approximateCircle(coordinates[1], coordinates[0], radiusM, 32);
-
-            map.addSource(sourceId, {
-                type: "geojson",
-                data: {
-                    type: "Feature",
-                    geometry: {
-                        type: "Polygon",
-                        coordinates: [circle],
-                    }
-                }
-            });
-            map.addLayer({
-                id: layerId,
-                type: "fill",
-                source: sourceId,
-                paint: {
-                    "fill-color": "#0000ff",
-                    "fill-opacity": 0.2
-                }
-            });
-        }
-        function removeAccuracyCircle(deviceId) {
-            const sourceId = "accuracy-circle-" + deviceId;
-            const layerId = sourceId + "-layer";
-            if (map.getLayer(layerId)) {
-                map.removeLayer(layerId);
+        trackers = finalDevices;
+        displayGroupCheckboxes();
+        populateTrackerSelect();
+        updateMap();
+        populateDepotList();
+        // Masquer l'overlay de chargement une fois les données chargées
+        document.getElementById('loading-overlay').style.display = 'none';
+      } catch (err) {
+        console.error('Erreur trackers:', err);
+        alert('Une erreur est survenue lors de la récupération des données.');
+        document.getElementById('loading-overlay').style.display = 'none';
+      }
+    }
+    function displayGroupCheckboxes() {
+      const groupList = document.getElementById('group-list');
+      groupList.innerHTML = '';
+      const uniqueGroups = [...new Set(trackers.map(t => t.group))].sort();
+      if (checkedGroupsSet.size === 0) uniqueGroups.forEach(g => checkedGroupsSet.add(g));
+      uniqueGroups.forEach(groupe => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.classList.add('group-checkbox');
+        checkbox.dataset.groupe = groupe;
+        checkbox.checked = checkedGroupsSet.has(groupe);
+        checkbox.addEventListener('change', (event) => {
+          if (event.target.checked) checkedGroupsSet.add(groupe);
+          else checkedGroupsSet.delete(groupe);
+          updateMap();
+        });
+        const label = document.createElement('label');
+        label.textContent = groupe;
+        label.prepend(checkbox);
+        const eyeIcon = document.createElement('span');
+        eyeIcon.textContent = ' 👁';
+        eyeIcon.style.cursor = 'pointer';
+        eyeIcon.title = "Afficher uniquement ce groupe";
+        eyeIcon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (checkedGroupsSet.size === 1 && checkedGroupsSet.has(groupe)) {
+            uniqueGroups.forEach(g => checkedGroupsSet.add(g));
+          } else {
+            checkedGroupsSet.clear();
+            checkedGroupsSet.add(groupe);
+          }
+          displayGroupCheckboxes();
+          updateMap();
+        });
+        label.appendChild(eyeIcon);
+        groupList.appendChild(label);
+      });
+    }
+    function populateTrackerSelect() {
+      const trackerSelect = document.getElementById('tracker-select');
+      const currentValue = trackerSelect.value;
+      trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
+      const combinedList = trackers.map(t => ({ type: 'tracker', id: t.deviceId, name: t.name }));
+      combinedList.sort((a, b) => a.name.localeCompare(b.name));
+      combinedList.forEach(item => {
+        const option = document.createElement('option');
+        option.value = `${item.type}-${item.id}`;
+        option.textContent = item.name;
+        trackerSelect.appendChild(option);
+      });
+      trackerSelect.value = currentValue;
+      trackerSelect.removeEventListener('change', trackerSelectChangeHandler);
+      trackerSelect.addEventListener('change', trackerSelectChangeHandler);
+    }
+    function trackerSelectChangeHandler(event) {
+      const val = event.target.value;
+      if (!val) return;
+      const idx = val.indexOf('-');
+      let type, id;
+      if (idx === -1) { type = 'tracker'; id = val; }
+      else { type = val.substring(0, idx); id = val.substring(idx + 1); }
+      const selected = trackers.find(t => String(t.deviceId) === String(id));
+      if (selected && typeof selected.latitude === 'number' && typeof selected.longitude === 'number') {
+        map.flyTo({ center: [selected.longitude, selected.latitude], zoom: map.getZoom() });
+        const marker = markers[selected.deviceId];
+        if (marker) openPopup(marker.getPopup());
+      }
+    }
+    function openPopup(popup) {
+      if (currentPopup) currentPopup.remove();
+      currentPopup = popup;
+      currentPopup.addTo(map);
+    }
+    function updateMap() {
+      if (!map) return;
+      const checkedGroups = Array.from(checkedGroupsSet);
+      const visibleTrackerIds = [];
+      trackers.forEach(t => {
+        if (!t.hasPositions) return;
+        if (!checkedGroups.includes(t.group)) return;
+        if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
+        visibleTrackerIds.push(String(t.deviceId));
+        let marker = markers[t.deviceId];
+        if (!marker) {
+          let el;
+          if (t.group.toLowerCase() === 'pickups') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
+            el.style.width = '80px';
+            el.style.height = '35px';
+          } else if (t.group.toLowerCase() === 'chargeuse') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
+            el.style.width = '90px';
+            el.style.height = '90px';
+          } else if (t.group.toLowerCase() === 'dumpers') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/dumper.png';
+            el.style.width = '90px';
+            el.style.height = '90px';
+          } else if (t.group.toLowerCase() === 'dameuse') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/Plaque_vibrante.png';
+            el.style.width = '50px';
+            el.style.height = '50px';
+          } else if (t.group.toLowerCase() === 'citernes') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/Citerne%201000l.png';
+            el.style.width = '60px';
+            el.style.height = '60px';
+          } else if (t.group.toLowerCase() === 'coffres') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/coffre.png';
+            el.style.width = '70px';
+            el.style.height = '70px';
+          } else if (t.group.toLowerCase() === 'pelles') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/grande_pelle.png';
+            el.style.width = '105px';
+            el.style.height = '105px';
+          } else if (t.group.toLowerCase() === 'camion') {
+            el = document.createElement('img');
+            el.src = 'https://github.com/ludobetris/3d-models/raw/main/IMG_5818.png';
+            el.style.width = '90px';
+            el.style.height = '90px';
+          } else {
+            el = document.createElement('div');
+            el.style.width = '20px';
+            el.style.height = '20px';
+            el.style.borderRadius = '50%';
+            el.style.backgroundColor = 'orange';
+          }
+          let popupHTML = `<strong>Nom:</strong> ${t.name}`;
+          if (t.isBeacon) {
+            if (t.avgVoltage !== null) {
+              const iconUrl = getBatteryIcon(t.avgVoltage);
+              const explanation = getBatteryTooltip(t.avgVoltage);
+              popupHTML += `<br/><strong>Batterie:</strong>
+                <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
+                <span title="${explanation}" style="color:blue; text-decoration:underline;">${t.avgVoltage} V</span>`;
             }
-            if (map.getSource(sourceId)) {
-                map.removeSource(sourceId);
+            popupHTML += `<br/><strong>Précision:</strong> ±${t.accuracy} m`;
+            if (t.accuracy > 20) popupHTML += `<br/><span style="color:red;">Position approximative !</span>`;
+          } else {
+            if (t.avgVoltage !== null) {
+              const iconUrl = getBatteryIcon(t.avgVoltage);
+              const explanation = getBatteryTooltip(t.avgVoltage);
+              popupHTML += `<br/><strong>Batterie:</strong>
+                <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
+                <a href="#" onclick="showVoltageChart(${t.deviceId}); return false;" title="${explanation}" style="color:blue; text-decoration:underline;">${t.avgVoltage} V</a>`;
             }
-        }
-
-        // ********** RÉCUPÉRATION DES TRACKERS **********
-        async function getTrackersData() {
-            try {
-                // 1) devices
-                const devicesResponse = await fetch('https://xf5655945.traccar.com/api/devices', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Basic ' + TRACCAR_AUTH,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (!devicesResponse.ok) {
-                    throw new Error("Erreur récupération devices: " + devicesResponse.statusText);
-                }
-                const devicesData = await devicesResponse.json();
-
-                // 2) groupes
-                const groupsResponse = await fetch('https://xf5655945.traccar.com/api/groups', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Basic ' + TRACCAR_AUTH,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (!groupsResponse.ok) {
-                    throw new Error("Erreur récupération groupes: " + groupsResponse.statusText);
-                }
-                const groupsData = await groupsResponse.json();
-                groups = groupsData;
-                groups.forEach(group => {
-                    groupIdToName[group.id] = group.name;
-                });
-
-                // 3) geofences
-                const geofencesResp = await fetch('https://xf5655945.traccar.com/api/geofences', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Basic ' + TRACCAR_AUTH,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (!geofencesResp.ok) {
-                    console.warn("Erreur récupération geofences:", geofencesResp.statusText);
-                } else {
-                    geofences = await geofencesResp.json();
-                }
-
-                const now = new Date();
-                const dateTo = now.toISOString();
-                const dateFrom = new Date(now.getTime() - 24*60*60*1000).toISOString(); 
-                const finalDevices = [];
-
-                // On boucle sur chaque device
-                for (const dev of devicesData) {
-                    const devGroup = dev.groupId ? (groupIdToName[dev.groupId] || 'Autre') : 'Autre';
-
-                    // Récupération du booléen "isbeacon" dans les attributs du device
-                    let isBeacon = false;
-                    if (dev.attributes && dev.attributes.isbeacon === true) {
-                        isBeacon = true;
-                    }
-
-                    // On récupère les positions
-                    const positionsUrl = `https://xf5655945.traccar.com/api/positions?deviceId=${dev.id}&from=${dateFrom}&to=${dateTo}`;
-                    const positionsResp = await fetch(positionsUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': 'Basic ' + TRACCAR_AUTH,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    if (!positionsResp.ok) {
-                        console.warn(`Erreur positions device ${dev.id}: ${positionsResp.statusText}`);
-                        continue;
-                    }
-                    const positionsData = await positionsResp.json();
-                    if (!positionsData || positionsData.length === 0) {
-                        finalDevices.push({
-                            deviceId: dev.id,
-                            name: dev.name || `Tracker ${dev.id}`,
-                            group: devGroup,
-                            latitude: null,
-                            longitude: null,
-                            hasPositions: false,
-                            avgVoltage: null,
-                            engineHoursToday: 0,
-                            lastConnectionTime: null,
-                            isBeacon: isBeacon,
-                            accuracy: 0
-                        });
-                        continue;
-                    }
-                    positionsData.sort((a, b) => new Date(a.deviceTime) - new Date(b.deviceTime));
-                    const lastPos = positionsData[positionsData.length - 1];
-                    const lat = parseFloat(lastPos.latitude);
-                    const lon = parseFloat(lastPos.longitude);
-
-                    let powers = [];
-                    for (let i = positionsData.length - 1; i >= 0 && powers.length < 3; i--) {
-                        let pVal = positionsData[i].attributes?.power;
-                        if (pVal !== undefined) {
-                            const parsed = parseFloat(pVal);
-                            if (!isNaN(parsed)) {
-                                powers.push(parsed);
-                            }
-                        }
-                    }
-                    let avgV = null;
-                    if (powers.length > 0) {
-                        const sum = powers.reduce((acc, val) => acc + val, 0);
-                        avgV = sum / powers.length;
-                        avgV = Math.round(avgV * 100) / 100;
-                    }
-
-                    // Si "isbeacon", on stocke l'accuracy dans l'objet
-                    let accuracyVal = parseFloat(lastPos.accuracy || 0);
-
-                    // Heures moteur (uniquement si pas beacon)
-                    let engineHoursToday = 0;
-                    if (!isBeacon) {
-                        engineHoursToday = calculateEngineHours(positionsData);
-                    }
-
-                    finalDevices.push({
-                        deviceId: dev.id,
-                        name: dev.name || `Tracker ${dev.id}`,
-                        group: devGroup,
-                        latitude: lat,
-                        longitude: lon,
-                        hasPositions: true,
-                        avgVoltage: avgV,
-                        engineHoursToday: engineHoursToday,
-                        lastConnectionTime: lastPos.deviceTime,
-                        isBeacon: isBeacon,
-                        accuracy: accuracyVal
-                    });
-                }
-                trackers = finalDevices;
-
-                displayGroupCheckboxes();
-                populateTrackerSelect();
-                updateMap();
-                populateDepotList();
-
-            } catch (err) {
-                console.error('Erreur trackers:', err);
-                alert('Une erreur est survenue lors de la récupération des données.');
+            if (t.engineHoursToday !== undefined) {
+              popupHTML += `<br/><strong>h moteur:</strong>
+                <a href="#" style="color:blue; text-decoration:underline;" onclick="showEngineModal(${t.deviceId}, ${t.engineHoursToday}); return false;">${t.engineHoursToday.toFixed(2)} h</a>`;
             }
-        }
-
-        function displayGroupCheckboxes() {
-            const groupList = document.getElementById('group-list');
-            groupList.innerHTML = '';
-
-            // Récupère la liste unique des groupes présents dans trackers
-            const uniqueGroups = [
-                ...new Set(trackers.map(t => t.group))
-            ].sort();
-
-            // Si c'est le premier chargement (checkedGroupsSet est vide), on coche tout
-            if (checkedGroupsSet.size === 0) {
-                uniqueGroups.forEach(g => checkedGroupsSet.add(g));
-            }
-
-            // Pour chaque groupe, on crée la case à cocher
-            uniqueGroups.forEach(groupe => {
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.classList.add('group-checkbox');
-                checkbox.dataset.groupe = groupe;
-                // On coche si le groupe est présent dans le set
-                checkbox.checked = checkedGroupsSet.has(groupe);
-
-                checkbox.addEventListener('change', (event) => {
-                    if (event.target.checked) {
-                        checkedGroupsSet.add(groupe);
-                    } else {
-                        checkedGroupsSet.delete(groupe);
-                    }
-                    updateMap();
-                });
-
-                const label = document.createElement('label');
-                label.textContent = groupe;
-                label.prepend(checkbox);
-                groupList.appendChild(label);
-            });
-        }
-
-        function populateTrackerSelect() {
+          }
+          const lastConnLabel = getLastConnectionLabel(t.lastConnectionTime);
+          if (lastConnLabel) popupHTML += `<br/><strong>Dernière connexion :</strong> ${lastConnLabel}`;
+          const popup = new mapboxgl.Popup({ closeButton: false, offset: 25 }).setHTML(popupHTML);
+          marker = new mapboxgl.Marker(el).setLngLat([t.longitude, t.latitude]).setPopup(popup);
+          marker.getElement().addEventListener('click', () => {
             const trackerSelect = document.getElementById('tracker-select');
-            const currentValue = trackerSelect.value;
-            trackerSelect.innerHTML = '<option value="">Sélectionnez un device</option>';
-
-            // On n'ajoute que les trackers + beacons, on les différencie juste par un flag interne
-            const combinedList = trackers.map(t => ({
-                type: 'tracker',
-                id: t.deviceId,
-                name: t.name
-            }));
-            combinedList.sort((a, b) => a.name.localeCompare(b.name));
-
-            combinedList.forEach(item => {
-                const option = document.createElement('option');
-                option.value = `${item.type}-${item.id}`;
-                option.textContent = item.name;
-                trackerSelect.appendChild(option);
-            });
-            trackerSelect.value = currentValue;
-            trackerSelect.removeEventListener('change', trackerSelectChangeHandler);
-            trackerSelect.addEventListener('change', trackerSelectChangeHandler);
+            trackerSelect.value = `tracker-${t.deviceId}`;
+            trackerSelect.dispatchEvent(new Event('change'));
+            if (t.isBeacon && t.accuracy > 0) addAccuracyCircle(t.deviceId, [t.longitude, t.latitude], t.accuracy);
+          });
+          popup.on('close', () => { if (t.isBeacon) removeAccuracyCircle(t.deviceId); });
+          marker.addTo(map);
+          markers[t.deviceId] = marker;
+        } else {
+          marker.setLngLat([t.longitude, t.latitude]);
         }
-
-        function trackerSelectChangeHandler(event) {
-            const val = event.target.value;
-            if (!val) return;
-            const idx = val.indexOf('-');
-            let type, id;
-            if (idx === -1) {
-                type = 'tracker';
-                id = val;
-            } else {
-                type = val.substring(0, idx);
-                id = val.substring(idx + 1);
+      });
+      Object.keys(markers).forEach(deviceId => {
+        if (!visibleTrackerIds.includes(deviceId)) {
+          markers[deviceId].remove();
+          delete markers[deviceId];
+        }
+      });
+      displayGeofences();
+    }
+    function populateDepotList() {
+      const depotList = document.getElementById('depot-list');
+      depotList.innerHTML = '';
+      function addDepotListItem(item) {
+        const dist = getDistanceFromLatLonInMeters(depotCoordinates[1], depotCoordinates[0], item.latitude, item.longitude);
+        if (dist <= 200) {
+          const li = document.createElement('li');
+          const btn = document.createElement('button');
+          btn.textContent = `${item.name} (${dist.toFixed(1)}m)`;
+          btn.addEventListener('click', () => {
+            if (item.longitude && item.latitude) {
+              map.flyTo({ center: [item.longitude, item.latitude] });
+              const marker = markers[item.deviceId];
+              if (marker) openPopup(marker.getPopup());
             }
-            const selected = trackers.find(t => String(t.deviceId) === String(id));
-            if (selected && typeof selected.latitude === 'number' && typeof selected.longitude === 'number') {
-                map.flyTo({ center: [selected.longitude, selected.latitude], zoom: map.getZoom() });
-                const marker = markers[selected.deviceId];
-                if (marker) {
-                    openPopup(marker.getPopup());
-                }
-            }
+          });
+          li.appendChild(btn);
+          depotList.appendChild(li);
         }
+      }
+      trackers.forEach(t => {
+        if (!t.hasPositions) return;
+        if (typeof t.latitude === 'number' && typeof t.longitude === 'number') addDepotListItem(t);
+      });
+      if (depotList.children.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = "Aucun tracker dans un rayon de 200m.";
+        depotList.appendChild(li);
+      }
+    }
 
-        function openPopup(popup) {
-            if (currentPopup) {
-                currentPopup.remove();
-            }
-            currentPopup = popup;
-            currentPopup.addTo(map);
+    // ********** BOUTONS ET CONTRÔLES **********
+    function setupToggleButtons() {
+      document.getElementById('toggle-controls').addEventListener('click', () => {
+        document.getElementById('controls-container').classList.toggle('active');
+      });
+      document.getElementById('toggle-depot').addEventListener('click', () => {
+        document.getElementById('depot-container').classList.toggle('active');
+      });
+    }
+    function setupMapSwitch() {
+      document.getElementById('map-switch').addEventListener('change', (event) => {
+        if (event.target.checked) map.setStyle('mapbox://styles/mapbox/satellite-v9');
+        else map.setStyle('mapbox://styles/mapbox/streets-v11');
+      });
+      map.on('style.load', () => {
+        Object.values(markers).forEach(m => m.addTo(map));
+        displayGeofences();
+      });
+    }
+    let searchMarker = null;
+    function displaySuggestions(query) {
+      fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
+        .then(r => r.json())
+        .then(data => {
+          suggestionsList.innerHTML = '';
+          if (data.features.length > 0) {
+            suggestionsList.style.display = 'block';
+            data.features.forEach(feature => {
+              const li = document.createElement('li');
+              li.textContent = feature.place_name;
+              li.addEventListener('click', () => {
+                const [lng, lat] = feature.center;
+                map.flyTo({ center: [lng, lat] });
+                if (searchMarker) searchMarker.remove();
+                const popup = new mapboxgl.Popup({ closeButton: false }).setHTML(`<strong>Résultat:</strong> ${feature.place_name}`);
+                searchMarker = new mapboxgl.Marker({ color: 'red' }).setLngLat([lng, lat]).setPopup(popup).addTo(map);
+                openPopup(popup);
+                suggestionsList.style.display = 'none';
+                searchInput.value = feature.place_name;
+              });
+              suggestionsList.appendChild(li);
+            });
+          } else {
+            suggestionsList.style.display = 'none';
+          }
+        })
+        .catch(err => { console.error('Erreur suggestions:', err); });
+    }
+    function setupSearch() {
+      document.getElementById('search-button').addEventListener('click', () => {
+        const q = searchInput.value.trim();
+        if (!q) { alert('Veuillez entrer une adresse.'); return; }
+        fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_API_KEY}`)
+          .then(r => r.json())
+          .then(data => {
+            if (!data.features.length) { alert("Aucun résultat trouvé."); return; }
+            const f0 = data.features[0];
+            const [lng, lat] = f0.center;
+            map.flyTo({ center: [lng, lat] });
+            if (searchMarker) searchMarker.remove();
+            const popup = new mapboxgl.Popup({ closeButton: false }).setHTML(`<strong>Résultat:</strong> ${f0.place_name}`);
+            searchMarker = new mapboxgl.Marker({ color: 'red' }).setLngLat([lng, lat]).setPopup(popup).addTo(map);
+            openPopup(popup);
+          })
+          .catch(err => { console.error('Erreur géocodage:', err); alert('Une erreur est survenue lors de la recherche d\'adresse.'); });
+      });
+      searchInput.addEventListener('input', (ev) => {
+        const q = ev.target.value.trim();
+        if (q.length > 2) displaySuggestions(q);
+        else suggestionsList.style.display = 'none';
+      });
+      document.addEventListener('click', (ev) => {
+        if (!searchInput.contains(ev.target) && !suggestionsList.contains(ev.target)) suggestionsList.style.display = 'none';
+      });
+    }
+    function setupMapClickListener() {
+      map.on('click', () => {
+        removeRoute();
+        hideTimeline();
+        if (timelineMarker) { timelineMarker.remove(); timelineMarker = null; }
+      });
+    }
+
+    // ********** GESTION DE LA ROUTE + TIMELINE **********
+    function createTimelineGradient(data) {
+      if (!data || data.length < 2) return '#ccc';
+      let segments = [];
+      const total = data.length - 1;
+      for (let i = 0; i < total; i++) {
+        const color = data[i].motion ? 'red' : '#D3D3D3';
+        const startPercent = (i / total) * 100;
+        const endPercent = ((i + 1) / total) * 100;
+        segments.push(`${color} ${startPercent}% ${endPercent}%`);
+      }
+      return `linear-gradient(to right, ${segments.join(', ')})`;
+    }
+    function fetchAndDisplayRoute(trackerId, dateStr) {
+      if (!trackerId || !dateStr) return;
+      removeRoute();
+      hideTimeline();
+      const dateObj = new Date(dateStr);
+      if (isNaN(dateObj.getTime())) { alert("Date invalide."); return; }
+      const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).toISOString();
+      const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1).toISOString();
+      fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
+        headers: { 'Authorization': 'Basic ' + TRACCAR_AUTH, 'Content-Type': 'application/json' }
+      })
+      .then(r => { if (!r.ok) throw new Error("Erreur route: " + r.statusText); return r.json(); })
+      .then(data => {
+        if (!data.length) { alert("Aucune donnée de route pour la date sélectionnée."); return; }
+        data.sort((a, b) => new Date(a.time) - new Date(b.time));
+        const coords = data.map(p => [parseFloat(p.longitude), parseFloat(p.latitude)]);
+        timelineData = data.map(p => ({ time: new Date(p.deviceTime), coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)], motion: p.attributes?.motion === true }));
+        addRouteToMap(coords);
+        initializeTimeline();
+      })
+      .catch(err => { console.error(err); alert("Erreur lors de la récupération de la route."); });
+    }
+    function setupRouteButton() {
+      const routeDateInput = document.getElementById('route-date');
+      const today = new Date();
+      routeDateInput.valueAsDate = today;
+      document.getElementById('route-button').addEventListener('click', () => {
+        if (currentPopup) { currentPopup.remove(); currentPopup = null; }
+        const val = document.getElementById('tracker-select').value;
+        if (!val) { alert("Sélectionner un device."); return; }
+        const idx = val.indexOf('-');
+        let type = val.substring(0, idx);
+        let id = val.substring(idx + 1);
+        if (type === 'tracker') {
+          const selectedDate = routeDateInput.value;
+          fetchAndDisplayRoute(id, selectedDate);
         }
-
-        // Mise à jour de la carte (marqueurs) en fonction des groupes cochés
-        function updateMap() {
-            if (!map) return;
-            const checkedGroups = Array.from(checkedGroupsSet);
-            const visibleTrackerIds = [];
-
-            // Affiche uniquement les trackers/beacons des groupes cochés
-            trackers.forEach(t => {
-                if (!t.hasPositions) return;
-                if (!checkedGroups.includes(t.group)) return;
-                if (typeof t.longitude !== 'number' || typeof t.latitude !== 'number') return;
-                visibleTrackerIds.push(String(t.deviceId));
-
-                let marker = markers[t.deviceId];
-                if (!marker) {
-                    // Création du marker
-                    let el;
-                    // Choix d’icône en fonction du groupe (exemple existant)
-                    if (t.group.toLowerCase() === 'pickups') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/pickup.png';
-                        el.style.width = '80px';
-                        el.style.height = '35px';
-                    } else if (t.group.toLowerCase() === 'chargeuse') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/Chargeuse.png';
-                        el.style.width = '90px';
-                        el.style.height = '90px';
-                    } else if (t.group.toLowerCase() === 'dumpers') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/dumper.png';
-                        el.style.width = '90px';
-                        el.style.height = '90px';
-                    } else if (t.group.toLowerCase() === 'dameuse') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/Plaque_vibrante.png';
-                        el.style.width = '50px';
-                        el.style.height = '50px';
-                    } else if (t.group.toLowerCase() === 'citernes') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/Citerne%201000l.png';
-                        el.style.width = '60px';
-                        el.style.height = '60px';
-                    } else if (t.group.toLowerCase() === 'coffres') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/coffre.png';
-                        el.style.width = '70px';
-                        el.style.height = '70px';
-                    } else if (t.group.toLowerCase() === 'pelles') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/grande_pelle.png';
-                        el.style.width = '105px';
-                        el.style.height = '105px';
-                    } else if (t.group.toLowerCase() === 'camion') {
-                        el = document.createElement('img');
-                        el.src = 'https://github.com/ludobetris/3d-models/raw/main/IMG_5818.png';
-                        el.style.width = '90px';
-                        el.style.height = '90px';
-                    } else {
-                        // Pour les autres groupes
-                        el = document.createElement('div');
-                        el.style.width = '20px';
-                        el.style.height = '20px';
-                        el.style.borderRadius = '50%';
-                        el.style.backgroundColor = 'orange';
-                    }
-
-                    // Construction du popup
-                    let popupHTML = `<strong>Nom:</strong> ${t.name}`;
-
-                    // Si c’est un beacon, on n’affiche pas les heures moteur
-                    if (t.isBeacon) {
-                        // Affiche la tension (si présente) ?
-                        if (t.avgVoltage !== null) {
-                            const iconUrl = getBatteryIcon(t.avgVoltage);
-                            const explanation = getBatteryTooltip(t.avgVoltage);
-                            popupHTML += `<br/><strong>Batterie:</strong>
-                                <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
-                                <span title="${explanation}"
-                                      style="color:blue; text-decoration:underline;">
-                                    ${t.avgVoltage} V
-                                </span>`;
-                        }
-                        // Affiche la précision
-                        popupHTML += `<br/><strong>Précision:</strong> ±${t.accuracy} m`;
-                        if (t.accuracy > 20) {
-                            popupHTML += `<br/><span style="color:red;">Position approximative !</span>`;
-                        }
-                    } else {
-                        // Tracker normal => on affiche la batterie et les heures moteur
-                        if (t.avgVoltage !== null) {
-                            const iconUrl = getBatteryIcon(t.avgVoltage);
-                            const explanation = getBatteryTooltip(t.avgVoltage);
-                            popupHTML += `<br/><strong>Batterie:</strong>
-                                <img src="${iconUrl}" alt="Battery" style="width:100px; vertical-align:middle; margin-right:1px;" />
-                                <a href="#" onclick="showVoltageChart(${t.deviceId}); return false;"
-                                   title="${explanation}"
-                                   style="color:blue; text-decoration:underline;">
-                                    ${t.avgVoltage} V
-                                </a>`;
-                        }
-                        // Heures moteur
-                        if (t.engineHoursToday !== undefined) {
-                            popupHTML += `<br/><strong>h moteur:</strong>
-                                <a href="#" style="color:blue; text-decoration:underline;"
-                                   onclick="showEngineModal(${t.deviceId}, ${t.engineHoursToday}); return false;">
-                                    ${t.engineHoursToday.toFixed(2)} h
-                                </a>`;
-                        }
-                    }
-
-                    // Dernière connexion
-                    const lastConnLabel = getLastConnectionLabel(t.lastConnectionTime);
-                    if (lastConnLabel) {
-                        popupHTML += `<br/><strong>Dernière connexion :</strong> ${lastConnLabel}`;
-                    }
-
-                    const popup = new mapboxgl.Popup({
-                        closeButton: false,
-                        offset: 25
-                    }).setHTML(popupHTML);
-
-                    marker = new mapboxgl.Marker(el)
-                        .setLngLat([t.longitude, t.latitude])
-                        .setPopup(popup);
-
-                    // Au clic sur le marker
-                    marker.getElement().addEventListener('click', () => {
-                        const trackerSelect = document.getElementById('tracker-select');
-                        trackerSelect.value = `tracker-${t.deviceId}`;
-                        trackerSelect.dispatchEvent(new Event('change'));
-
-                        // Si c'est un beacon, on affiche le cercle de précision
-                        if (t.isBeacon && t.accuracy > 0) {
-                            addAccuracyCircle(t.deviceId, [t.longitude, t.latitude], t.accuracy);
-                        }
-                    });
-
-                    // Quand le popup se ferme, on enlève le cercle de précision si c'était un beacon
-                    popup.on('close', () => {
-                        if (t.isBeacon) {
-                            removeAccuracyCircle(t.deviceId);
-                        }
-                    });
-
-                    marker.addTo(map);
-                    markers[t.deviceId] = marker;
-                } else {
-                    // Marker déjà existant => on met à jour la position
-                    marker.setLngLat([t.longitude, t.latitude]);
-                }
-            });
-
-            // Supprime les marqueurs des trackers non visibles
-            Object.keys(markers).forEach(deviceId => {
-                if (!visibleTrackerIds.includes(deviceId)) {
-                    markers[deviceId].remove();
-                    delete markers[deviceId];
-                }
-            });
-
-            // Geofences
-            displayGeofences();
+      });
+      routeDateInput.addEventListener('change', () => {
+        const val = document.getElementById('tracker-select').value;
+        if (!val) return;
+        const idx = val.indexOf('-');
+        let type = val.substring(0, idx);
+        let id = val.substring(idx+1);
+        if (type === 'tracker') {
+          const selectedDate = routeDateInput.value;
+          fetchAndDisplayRoute(id, selectedDate);
         }
+      });
+    }
+    function addRouteToMap(coords) {
+      removeRoute();
+      map.addSource(routeLayerId, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } });
+      map.addLayer({ id: routeLayerId, type: 'line', source: routeLayerId, layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#FF0000', 'line-width': 4 } });
+    }
+    function removeRoute() {
+      if (map && map.getLayer(routeLayerId)) map.removeLayer(routeLayerId);
+      if (map && map.getSource(routeLayerId)) map.removeSource(routeLayerId);
+    }
+    function initializeTimeline() {
+      const timelineContainer = document.getElementById('timeline-container');
+      const timeline = document.getElementById('timeline');
+      const currentTimeDisplay = document.getElementById('current-time');
+      if (!timelineData.length) return;
+      timelineContainer.style.display = 'flex';
+      timeline.min = 0;
+      timeline.max = timelineData.length - 1;
+      timeline.value = 0;
+      currentTimeDisplay.textContent = formatTime(timelineData[0].time);
+      const gradient = createTimelineGradient(timelineData);
+      document.documentElement.style.setProperty('--timeline-gradient', gradient);
+      if (timelineMarker) { timelineMarker.remove(); timelineMarker = null; }
+      timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' }).setLngLat(timelineData[0].coordinates).addTo(map);
+      timeline.addEventListener('input', (ev) => {
+        const i = parseInt(ev.target.value);
+        const pos = timelineData[i];
+        if (!pos) return;
+        currentTimeDisplay.textContent = formatTime(pos.time);
+        if (timelineMarker) timelineMarker.setLngLat(pos.coordinates);
+        else { timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' }).setLngLat(pos.coordinates).addTo(map); }
+        map.flyTo({ center: pos.coordinates });
+      });
+    }
+    function hideTimeline() {
+      const timelineContainer = document.getElementById('timeline-container');
+      timelineContainer.style.display = 'none';
+      const timeline = document.getElementById('timeline');
+      timeline.value = 0;
+      document.getElementById('current-time').textContent = '00:00:00';
+      document.documentElement.style.setProperty('--timeline-gradient', '#ccc');
+    }
+    function formatTime(date) {
+      const h = String(date.getHours()).padStart(2, '0');
+      const m = String(date.getMinutes()).padStart(2, '0');
+      const s = String(date.getSeconds()).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
 
-        function populateDepotList() {
-            const depotList = document.getElementById('depot-list');
-            depotList.innerHTML = '';
-
-            function addDepotListItem(item) {
-                const dist = getDistanceFromLatLonInMeters(
-                    depotCoordinates[1],
-                    depotCoordinates[0],
-                    item.latitude,
-                    item.longitude
-                );
-                if (dist <= 200) {
-                    const li = document.createElement('li');
-                    const btn = document.createElement('button');
-                    btn.textContent = `${item.name} (${dist.toFixed(1)}m)`;
-                    btn.addEventListener('click', () => {
-                        if (item.longitude && item.latitude) {
-                            map.flyTo({ center: [item.longitude, item.latitude] });
-                            const marker = markers[item.deviceId];
-                            if (marker) {
-                                openPopup(marker.getPopup());
-                            }
-                        }
-                    });
-                    li.appendChild(btn);
-                    depotList.appendChild(li);
-                }
-            }
-
-            trackers.forEach(t => {
-                if (!t.hasPositions) return;
-                if (typeof t.latitude === 'number' && typeof t.longitude === 'number') {
-                    addDepotListItem(t);
-                }
-            });
-
-            if (depotList.children.length === 0) {
-                const li = document.createElement('li');
-                li.textContent = "Aucun tracker dans un rayon de 200m.";
-                depotList.appendChild(li);
-            }
+    // ********** INITIALISATION **********
+    function initializeMap() {
+      mapboxgl.accessToken = MAPBOX_API_KEY;
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: [7.475422, 46.257917],
+        zoom: 14
+      });
+      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.on('load', () => {
+        getTrackersData();
+        updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
+        if (navigator.geolocation) {
+          watchPositionId = navigator.geolocation.watchPosition(
+            pos => {
+              const { latitude, longitude } = pos.coords;
+              if (!myLocationMarker) {
+                const el = document.createElement('div');
+                el.style.width = '20px';
+                el.style.height = '20px';
+                el.style.borderRadius = '50%';
+                el.style.backgroundColor = 'blue';
+                el.style.boxShadow = '0 0 10px 2px rgba(0,0,255,0.5)';
+                myLocationMarker = new mapboxgl.Marker({ element: el }).setLngLat([longitude, latitude]).addTo(map);
+              } else { myLocationMarker.setLngLat([longitude, latitude]); }
+            },
+            err => { console.warn("Géolocalisation refusée:", err); },
+            { enableHighAccuracy: true }
+          );
         }
+      });
+      setupMapClickListener();
+      setupToggleButtons();
+      setupMapSwitch();
+      setupSearch();
+      setupRouteButton();
+      document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
+      document.getElementById('engine-modal-close').addEventListener('click', closeEngineModal);
+      document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
+      document.getElementById('export-engine-button').addEventListener('click', exportEngineDataToExcel);
+      document.getElementById('battery-calc-button').addEventListener('click', loadBatteryDataForRange);
+      document.getElementById('search-container').style.display = 'flex';
+      document.getElementById('toggle-controls').style.display = 'flex';
+      document.getElementById('toggle-depot').style.display = 'flex';
+      document.getElementById('map-switch-container').style.display = 'flex';
+    }
+    function stopUpdatingPositions() {
+      if (updateIntervalId) { clearInterval(updateIntervalId); updateIntervalId = null; }
+      if (watchPositionId) { navigator.geolocation.clearWatch(watchPositionId); watchPositionId = null; }
+    }
+    window.addEventListener('beforeunload', () => { stopUpdatingPositions(); });
 
-        // ********** BOUTONS ET CONTRÔLES **********
-        function setupToggleButtons() {
-            document.getElementById('toggle-controls').addEventListener('click', () => {
-                document.getElementById('controls-container').classList.toggle('active');
-            });
-            document.getElementById('toggle-depot').addEventListener('click', () => {
-                document.getElementById('depot-container').classList.toggle('active');
-            });
-        }
-
-        function setupMapSwitch() {
-            document.getElementById('map-switch').addEventListener('change', (event) => {
-                if (event.target.checked) {
-                    map.setStyle('mapbox://styles/mapbox/satellite-v9');
-                } else {
-                    map.setStyle('mapbox://styles/mapbox/streets-v11');
-                }
-            });
-            map.on('style.load', () => {
-                Object.values(markers).forEach(m => m.addTo(map));
-                displayGeofences();
-            });
-        }
-
-        let searchMarker = null;
-        function displaySuggestions(query) {
-            fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_API_KEY}`)
-                .then(r => r.json())
-                .then(data => {
-                    suggestionsList.innerHTML = '';
-                    if (data.features.length > 0) {
-                        suggestionsList.style.display = 'block';
-                        data.features.forEach(feature => {
-                            const li = document.createElement('li');
-                            li.textContent = feature.place_name;
-                            li.addEventListener('click', () => {
-                                const [lng, lat] = feature.center;
-                                map.flyTo({ center: [lng, lat] });
-                                if (searchMarker) searchMarker.remove();
-                                const popup = new mapboxgl.Popup({ closeButton: false })
-                                    .setHTML(`<strong>Résultat:</strong> ${feature.place_name}`);
-                                searchMarker = new mapboxgl.Marker({ color: 'red' })
-                                    .setLngLat([lng, lat])
-                                    .setPopup(popup)
-                                    .addTo(map);
-                                openPopup(popup);
-                                suggestionsList.style.display = 'none';
-                                searchInput.value = feature.place_name;
-                            });
-                            suggestionsList.appendChild(li);
-                        });
-                    } else {
-                        suggestionsList.style.display = 'none';
-                    }
-                })
-                .catch(err => {
-                    console.error('Erreur suggestions:', err);
-                });
-        }
-
-        function setupSearch() {
-            document.getElementById('search-button').addEventListener('click', () => {
-                const q = searchInput.value.trim();
-                if (!q) {
-                    alert('Veuillez entrer une adresse.');
-                    return;
-                }
-                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_API_KEY}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (!data.features.length) {
-                            alert("Aucun résultat trouvé.");
-                            return;
-                        }
-                        const f0 = data.features[0];
-                        const [lng, lat] = f0.center;
-                        map.flyTo({ center: [lng, lat] });
-                        if (searchMarker) searchMarker.remove();
-                        const popup = new mapboxgl.Popup({ closeButton: false })
-                            .setHTML(`<strong>Résultat:</strong> ${f0.place_name}`);
-                        searchMarker = new mapboxgl.Marker({ color: 'red' })
-                            .setLngLat([lng, lat])
-                            .setPopup(popup)
-                            .addTo(map);
-                        openPopup(popup);
-                    })
-                    .catch(err => {
-                        console.error('Erreur géocodage:', err);
-                        alert('Une erreur est survenue lors de la recherche d\'adresse.');
-                    });
-            });
-
-            searchInput.addEventListener('input', (ev) => {
-                const q = ev.target.value.trim();
-                if (q.length > 2) {
-                    displaySuggestions(q);
-                } else {
-                    suggestionsList.style.display = 'none';
-                }
-            });
-
-            document.addEventListener('click', (ev) => {
-                if (!searchInput.contains(ev.target) && !suggestionsList.contains(ev.target)) {
-                    suggestionsList.style.display = 'none';
-                }
-            });
-        }
-
-        function setupMapClickListener() {
-            map.on('click', () => {
-                removeRoute();
-                hideTimeline();
-                if (timelineMarker) {
-                    timelineMarker.remove();
-                    timelineMarker = null;
-                }
-            });
-        }
-
-        // ********** GESTION DE LA ROUTE + TIMELINE **********
-        function createTimelineGradient(data) {
-            if (!data || data.length < 2) {
-                return '#ccc';
-            }
-            let segments = [];
-            const total = data.length - 1;
-            for (let i = 0; i < total; i++) {
-                const color = data[i].motion ? 'red' : '#D3D3D3';
-                const startPercent = (i / total) * 100;
-                const endPercent = ((i + 1) / total) * 100;
-                segments.push(`${color} ${startPercent}% ${endPercent}%`);
-            }
-            return `linear-gradient(to right, ${segments.join(', ')})`;
-        }
-
-        function fetchAndDisplayRoute(trackerId, dateStr) {
-            if (!trackerId || !dateStr) return;
-            removeRoute();
-            hideTimeline();
-
-            const dateObj = new Date(dateStr);
-            if (isNaN(dateObj.getTime())) {
-                alert("Date invalide.");
-                return;
-            }
-            const startOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()).toISOString();
-            const endOfDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1).toISOString();
-
-            fetch(`https://xf5655945.traccar.com/api/positions?deviceId=${trackerId}&from=${startOfDay}&to=${endOfDay}`, {
-                headers: {
-                    'Authorization': 'Basic ' + TRACCAR_AUTH,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(r => {
-                if (!r.ok) throw new Error("Erreur route: " + r.statusText);
-                return r.json();
-            })
-            .then(data => {
-                if (!data.length) {
-                    alert("Aucune donnée de route pour la date sélectionnée.");
-                    return;
-                }
-                data.sort((a, b) => new Date(a.time) - new Date(b.time));
-                const coords = data.map(p => [parseFloat(p.longitude), parseFloat(p.latitude)]);
-
-                timelineData = data.map(p => ({
-                    time: new Date(p.deviceTime),
-                    coordinates: [parseFloat(p.longitude), parseFloat(p.latitude)],
-                    motion: p.attributes?.motion === true
-                }));
-                addRouteToMap(coords);
-                initializeTimeline();
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Erreur lors de la récupération de la route.");
-            });
-        }
-
-        function setupRouteButton() {
-            const routeDateInput = document.getElementById('route-date');
-            const today = new Date();
-            routeDateInput.valueAsDate = today;
-
-            document.getElementById('route-button').addEventListener('click', () => {
-                if (currentPopup) {
-                    currentPopup.remove();
-                    currentPopup = null;
-                }
-                const val = document.getElementById('tracker-select').value;
-                if (!val) {
-                    alert("Sélectionner un device.");
-                    return;
-                }
-                const idx = val.indexOf('-');
-                let type = val.substring(0, idx);
-                let id = val.substring(idx + 1);
-                if (type === 'tracker') {
-                    const selectedDate = routeDateInput.value; 
-                    fetchAndDisplayRoute(id, selectedDate);
-                }
-            });
-            routeDateInput.addEventListener('change', () => {
-                const val = document.getElementById('tracker-select').value;
-                if (!val) return;
-                const idx = val.indexOf('-');
-                let type = val.substring(0, idx);
-                let id = val.substring(idx+1);
-                if (type === 'tracker') {
-                    const selectedDate = routeDateInput.value; 
-                    fetchAndDisplayRoute(id, selectedDate);
-                }
-            });
-        }
-
-        function addRouteToMap(coords) {
-            removeRoute();
-            map.addSource(routeLayerId, {
-                type: 'geojson',
-                data: {
-                    type: 'Feature',
-                    properties: {},
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: coords
-                    }
-                }
-            });
-            map.addLayer({
-                id: routeLayerId,
-                type: 'line',
-                source: routeLayerId,
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round'
-                },
-                paint: {
-                    'line-color': '#FF0000',
-                    'line-width': 4
-                }
-            });
-        }
-
-        function removeRoute() {
-            if (map && map.getLayer(routeLayerId)) {
-                map.removeLayer(routeLayerId);
-            }
-            if (map && map.getSource(routeLayerId)) {
-                map.removeSource(routeLayerId);
-            }
-        }
-
-        function initializeTimeline() {
-            const timelineContainer = document.getElementById('timeline-container');
-            const timeline = document.getElementById('timeline');
-            const currentTimeDisplay = document.getElementById('current-time');
-            if (!timelineData.length) return;
-            timelineContainer.style.display = 'flex';
-            timeline.min = 0;
-            timeline.max = timelineData.length - 1;
-            timeline.value = 0;
-            currentTimeDisplay.textContent = formatTime(timelineData[0].time);
-
-            const gradient = createTimelineGradient(timelineData);
-            document.documentElement.style.setProperty('--timeline-gradient', gradient);
-
-            if (timelineMarker) {
-                timelineMarker.remove();
-                timelineMarker = null;
-            }
-            timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' })
-                .setLngLat(timelineData[0].coordinates)
-                .addTo(map);
-
-            timeline.addEventListener('input', (ev) => {
-                const i = parseInt(ev.target.value);
-                const pos = timelineData[i];
-                if (!pos) return;
-                currentTimeDisplay.textContent = formatTime(pos.time);
-                if (timelineMarker) {
-                    timelineMarker.setLngLat(pos.coordinates);
-                } else {
-                    timelineMarker = new mapboxgl.Marker({ color: 'yellow', size: 'large' })
-                        .setLngLat(pos.coordinates)
-                        .addTo(map);
-                }
-                map.flyTo({ center: pos.coordinates });
-            });
-        }
-
-        function hideTimeline() {
-            const timelineContainer = document.getElementById('timeline-container');
-            timelineContainer.style.display = 'none';
-            const timeline = document.getElementById('timeline');
-            timeline.value = 0;
-            document.getElementById('current-time').textContent = '00:00:00';
-            document.documentElement.style.setProperty('--timeline-gradient', '#ccc');
-        }
-        function formatTime(date) {
-            const h = String(date.getHours()).padStart(2, '0');
-            const m = String(date.getMinutes()).padStart(2, '0');
-            const s = String(date.getSeconds()).padStart(2, '0');
-            return `${h}:${m}:${s}`;
-        }
-
-        // ********** INITIALISATION **********
-        function initializeMap() {
-            mapboxgl.accessToken = MAPBOX_API_KEY;
-            map = new mapboxgl.Map({
-                container: 'map',
-                style: 'mapbox://styles/mapbox/streets-v11',
-                center: [7.475422, 46.257917],
-                zoom: 14
-            });
-            map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-                    
-            map.on('load', () => {
-                getTrackersData();
-                updateIntervalId = setInterval(getTrackersData, UPDATE_INTERVAL);
-                // Géolocalisation continue
-                if (navigator.geolocation) {
-                    watchPositionId = navigator.geolocation.watchPosition(
-                        pos => {
-                            const { latitude, longitude } = pos.coords;
-                            if (!myLocationMarker) {
-                                const el = document.createElement('div');
-                                el.style.width = '20px';
-                                el.style.height = '20px';
-                                el.style.borderRadius = '50%';
-                                el.style.backgroundColor = 'blue';
-                                el.style.boxShadow = '0 0 10px 2px rgba(0,0,255,0.5)';
-                                myLocationMarker = new mapboxgl.Marker({ element: el })
-                                    .setLngLat([longitude, latitude])
-                                    .addTo(map);
-                            } else {
-                                myLocationMarker.setLngLat([longitude, latitude]);
-                            }
-                        },
-                        err => {
-                            console.warn("Géolocalisation refusée:", err);
-                        },
-                        { enableHighAccuracy: true }
-                    );
-                }
-            });
-
-            setupMapClickListener();
-            setupToggleButtons();
-            setupMapSwitch();
-            setupSearch();
-            setupRouteButton();
-
-            document.getElementById('battery-modal-close').addEventListener('click', closeVoltageChart);
-            document.getElementById('engine-modal-close').addEventListener('click', closeEngineModal);
-            document.getElementById('engine-calc-button').addEventListener('click', loadEngineDataForRange);
-            document.getElementById('export-engine-button').addEventListener('click', exportEngineDataToExcel);
-            document.getElementById('battery-calc-button').addEventListener('click', loadBatteryDataForRange);
-
-            document.getElementById('search-container').style.display = 'flex';
-            document.getElementById('toggle-controls').style.display = 'flex';
-            document.getElementById('toggle-depot').style.display = 'flex';
-            document.getElementById('map-switch-container').style.display = 'flex';
-        }
-
-        function stopUpdatingPositions() {
-            if (updateIntervalId) {
-                clearInterval(updateIntervalId);
-                updateIntervalId = null;
-            }
-            if (watchPositionId) {
-                navigator.geolocation.clearWatch(watchPositionId);
-                watchPositionId = null;
-            }
-        }
-
-        window.addEventListener('beforeunload', () => {
-            stopUpdatingPositions();
-        });
-
-        // ********** FORMULAIRE DE CONNEXION **********
-        document.getElementById('credentials-form').addEventListener('submit', (event) => {
-            event.preventDefault();
-            const mapboxKeyInput = document.getElementById('mapbox-key').value.trim();
-            const traccarUsername = document.getElementById('traccar-username').value.trim();
-            const traccarPassword = document.getElementById('traccar-password').value.trim();
-
-            if (!mapboxKeyInput || !traccarUsername || !traccarPassword) {
-                alert("Veuillez remplir tous les champs.");
-                return;
-            }
-            MAPBOX_API_KEY = mapboxKeyInput;
-            TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
-            document.getElementById('credentials-modal').style.display = 'none';
-            initializeMap();
-        });
-    </script>
+    // ********** FORMULAIRE DE CONNEXION **********
+    document.getElementById('credentials-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const traccarUsername = document.getElementById('traccar-username').value.trim();
+      const traccarPassword = document.getElementById('traccar-password').value.trim();
+      if (!traccarUsername || !traccarPassword) {
+        alert("Veuillez remplir tous les champs.");
+        return;
+      }
+      TRACCAR_AUTH = btoa(`${traccarUsername}:${traccarPassword}`);
+      // Masquer le formulaire de connexion
+      document.getElementById('credentials-modal').style.display = 'none';
+      // Afficher l'overlay de chargement après connexion
+      document.getElementById('loading-overlay').style.display = 'flex';
+      initializeMap();
+    });
+  </script>
 </body>
 </html>
